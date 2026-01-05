@@ -49,7 +49,28 @@ const apiTokenService = {
 			throw new BizError(t('apiPermissionDenied'), 403);
 		}
 
-		// 生成新的API Token
+		// 【优化】检查用户是否已有有效的 API Token，避免重复写入 KV
+		if (userRow.apiToken) {
+			const kvData = await c.env.kv.get(KvConst.USER_API_TOKEN + userRow.apiToken, { type: 'json' });
+			if (kvData) {
+				// Token 在 KV 中有效，直接返回，不写入 KV
+				return { 
+					token: userRow.apiToken,
+					userId: userRow.userId
+				};
+			}
+			// KV 中不存在（可能已过期），重新写入 KV 但复用数据库中的 Token
+			await c.env.kv.put(KvConst.USER_API_TOKEN + userRow.apiToken, JSON.stringify({
+				userId: userRow.userId,
+				email: userRow.email
+			}));
+			return { 
+				token: userRow.apiToken,
+				userId: userRow.userId
+			};
+		}
+
+		// 首次生成：创建新的 API Token
 		const apiToken = uuidv4();
 
 		// 保存到数据库
