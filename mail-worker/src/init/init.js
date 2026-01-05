@@ -23,8 +23,18 @@ const init = {
 		await this.v1_7DB(c);
 		await this.v2DB(c);
 		await this.v2_1DB(c);
+		await this.v2_2DB(c);
 		await settingService.refresh(c);
 		return c.text(t('initSuccess'));
+	},
+
+	async v2_2DB(c) {
+		// 添加 to_email 索引，优化按收件邮箱查询性能
+		try {
+			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_email_to_email ON email(to_email);`).run();
+		} catch (e) {
+			console.warn(`跳过索引创建，原因：${e.message}`);
+		}
 	},
 
 	async v2DB(c) {
