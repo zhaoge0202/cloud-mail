@@ -9,7 +9,6 @@ import { v4 as uuidv4 } from 'uuid';
 import orm from '../entity/orm';
 import user from '../entity/user';
 import { eq } from 'drizzle-orm';
-import KvConst from '../const/kv-const';
 
 const apiTokenService = {
 	/**
@@ -49,21 +48,8 @@ const apiTokenService = {
 			throw new BizError(t('apiPermissionDenied'), 403);
 		}
 
-		// 【优化】检查用户是否已有有效的 API Token，避免重复写入 KV
+		// 【优化】检查用户是否已有 API Token，直接返回，不查询 KV
 		if (userRow.apiToken) {
-			const kvData = await c.env.kv.get(KvConst.USER_API_TOKEN + userRow.apiToken, { type: 'json' });
-			if (kvData) {
-				// Token 在 KV 中有效，直接返回，不写入 KV
-				return { 
-					token: userRow.apiToken,
-					userId: userRow.userId
-				};
-			}
-			// KV 中不存在（可能已过期），重新写入 KV 但复用数据库中的 Token
-			await c.env.kv.put(KvConst.USER_API_TOKEN + userRow.apiToken, JSON.stringify({
-				userId: userRow.userId,
-				email: userRow.email
-			}));
 			return { 
 				token: userRow.apiToken,
 				userId: userRow.userId
@@ -73,18 +59,12 @@ const apiTokenService = {
 		// 首次生成：创建新的 API Token
 		const apiToken = uuidv4();
 
-		// 保存到数据库
+		// 只保存到数据库，不写入 KV
 		await orm(c)
 			.update(user)
 			.set({ apiToken })
 			.where(eq(user.userId, userRow.userId))
 			.run();
-
-		// 同时保存到KV，用于快速验证
-		await c.env.kv.put(KvConst.USER_API_TOKEN + apiToken, JSON.stringify({
-			userId: userRow.userId,
-			email: userRow.email
-		}));
 
 		return { 
 			token: apiToken,
@@ -94,6 +74,7 @@ const apiTokenService = {
 
 	/**
 	 * 验证API Token
+	 * 【优化】直接查询数据库，不使用 KV，减少 KV 读取次数
 	 * @param {Object} c - Hono context
 	 * @param {string} token - API Token
 	 * @returns {Object|null} { userId, email } or null
@@ -104,30 +85,7 @@ const apiTokenService = {
 		}
 
 		try {
-			// 先从KV中查询（快速验证）
-			const kvData = await c.env.kv.get(KvConst.USER_API_TOKEN + token, { type: 'json' });
-
-			if (kvData) {
-				// 验证用户是否仍然存在且未被删除
-				const userRow = await userService.selectById(c, kvData.userId);
-				if (userRow) {
-					// 检查用户角色的API权限
-					const roleRow = await roleService.selectById(c, userRow.type);
-
-					// 非管理员需要检查API权限
-					if (!adminUtils.isAdmin(c, userRow.email) && (!roleRow || roleRow.enableApi !== 1)) {
-						console.log(`[API Token Verify Failed] User: ${userRow.email}, Role: ${roleRow?.name || 'N/A'}, EnableApi: ${roleRow?.enableApi || 'N/A'}`);
-						return null;
-					}
-
-					return {
-						userId: kvData.userId,
-						email: kvData.email
-					};
-				}
-			}
-
-			// KV中没有，从数据库查询
+			// 直接从数据库查询，不查 KV
 			const userRow = await orm(c)
 				.select()
 				.from(user)
@@ -147,10 +105,6 @@ const apiTokenService = {
 				return null;
 			}
 
-			// 注意: 不在这里写入KV,以节省KV写入额度
-			// KV写入只在generateToken时进行
-			// 如果KV miss,直接查询数据库即可
-
 			return {
 				userId: userRow.userId,
 				email: userRow.email
@@ -163,19 +117,12 @@ const apiTokenService = {
 
 	/**
 	 * 撤销用户的API Token
+	 * 【优化】只操作数据库，不操作 KV
 	 * @param {Object} c - Hono context
 	 * @param {number} userId - 用户ID
 	 */
 	async revokeToken(c, userId) {
-		// 获取当前token
-		const userRow = await userService.selectById(c, userId);
-		
-		if (userRow && userRow.apiToken) {
-			// 从KV中删除
-			await c.env.kv.delete(KvConst.USER_API_TOKEN + userRow.apiToken);
-		}
-
-		// 从数据库中清除
+		// 直接从数据库中清除，不操作 KV
 		await orm(c)
 			.update(user)
 			.set({ apiToken: null })

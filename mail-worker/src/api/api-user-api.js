@@ -218,7 +218,8 @@ app.post('/user/email/list', async (c) => {
 	conditions.push(eq(email.userId, userId));
 
 	if (toEmail) {
-		conditions.push(sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`);
+		// 使用精确匹配，走索引 idx_email_to_email，避免全表扫描
+		conditions.push(eq(email.toEmail, toEmail));
 	}
 
 	if (sendEmail) {
