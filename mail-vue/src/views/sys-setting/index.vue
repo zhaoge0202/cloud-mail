@@ -492,9 +492,43 @@
           </div>
         </template>
         <div class="forward-set-body">
-          <el-input :placeholder="$t('tgBotToken')" v-model="tgBotToken"></el-input>
+          <el-input :placeholder="setting.tgBotToken || $t('tgBotToken')" v-model="tgBotToken"></el-input>
           <el-input-tag tag-type="warning" :placeholder="$t('toBotTokenDesc')" v-model="tgChatId"
                         @add-tag="addChatTag"></el-input-tag>
+          <el-input :placeholder="$t('customDomainDesc')" v-model="customDomain"></el-input>
+          <div class="tg-msg-label">
+            <span>{{ $t('from') }}</span>
+            <el-select v-model="tgMsgFrom">
+              <el-option
+                  v-for="item in tgMsgFromOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+              />
+            </el-select>
+          </div>
+          <div class="tg-msg-label">
+            <span>{{ $t('recipient') }}</span>
+            <el-select v-model="tgMsgTo">
+              <el-option
+                  v-for="item in tgMsgToOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+              />
+            </el-select>
+          </div>
+          <div class="tg-msg-label">
+            <span>{{ $t('emailText') }}</span>
+            <el-select v-model="tgMsgText">
+              <el-option
+                  v-for="item in tgMsgTextOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+              />
+            </el-select>
+          </div>
         </div>
         <template #footer>
           <div class="dialog-footer">
@@ -804,6 +838,7 @@ const options = computed(() => [
 ])
 
 const tgChatId = ref([])
+const customDomain = ref('')
 const tgBotStatus = ref(0)
 const tgBotToken = ref('')
 const forwardEmail = ref([])
@@ -812,6 +847,24 @@ const emailColumnWidth = ref(0)
 const tokenColumnWidth = ref(0)
 const ruleType = ref(0)
 const ruleEmail = ref([])
+const tgMsgFrom = ref('')
+const tgMsgTo = ref('')
+const tgMsgText = ref('')
+
+const tgMsgFromOptions = computed(() => [
+  {label: t('show'), value: 'show'},
+  {label: t('hide'), value: 'hide'},
+  {label: t('onlyName'), value: 'only-name'},
+])
+const tgMsgToOptions = computed(() => [
+  {label: t('show'), value: 'show'},
+  {label: t('hide'), value: 'hide'},
+])
+const tgMsgTextOptions = computed(() => [
+  {label: t('show'), value: 'show'},
+  {label: t('hide'), value: 'hide'},
+])
+const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px')
 
 getSettings()
 getUpdate()
@@ -946,7 +999,11 @@ function closedSetBackground() {
 
 function openTgSetting() {
   tgBotStatus.value = setting.value.tgBotStatus
-  tgBotToken.value = setting.value.tgBotToken
+  tgBotToken.value = ''
+  customDomain.value = setting.value.customDomain || ''
+  tgMsgFrom.value = setting.value.tgMsgFrom || 'only-name'
+  tgMsgTo.value = setting.value.tgMsgTo || 'show'
+  tgMsgText.value = setting.value.tgMsgText || 'hide'
   tgChatId.value = []
   if (setting.value.tgChatId) {
     const list = setting.value.tgChatId.split(',')
@@ -1077,10 +1134,14 @@ function saveS3() {
 
 function tgBotSave() {
   const form = {
-    tgBotToken: tgBotToken.value,
+    customDomain: customDomain.value,
     tgBotStatus: tgBotStatus.value,
-    tgChatId: tgChatId.value + ''
+    tgChatId: tgChatId.value + '',
+    tgMsgFrom: tgMsgFrom.value,
+    tgMsgTo: tgMsgTo.value,
+    tgMsgText: tgMsgText.value
   }
+  if (tgBotToken.value) form.tgBotToken = tgBotToken.value
   editSetting(form)
 }
 
@@ -1306,6 +1367,7 @@ function change(e) {
   delete settingForm.secretKey
   delete settingForm.s3AccessKey
   delete settingForm.s3SecretKey
+  delete settingForm.tgBotToken
   delete settingForm.resendTokens
   delete settingForm.smtp2goTokens
   editSetting(settingForm, false)
@@ -1673,6 +1735,16 @@ function editSetting(settingForm, refreshStatus = true) {
 
   .el-switch {
     align-self: end;
+  }
+
+  .tg-msg-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .el-select {
+      width: v-bind(tgMsgLabelWidth);
+    }
   }
 }
 

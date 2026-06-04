@@ -44,6 +44,7 @@ const settingService = {
 			throw new BizError(t('noDomainVariable'));
 		}
 
+		applyTelegramSettingDefaults(setting);
 		domainList = domainList.map(item => '@' + item);
 		setting.domainList = domainList;
 		c.set?.('setting', setting);
@@ -74,6 +75,7 @@ const settingService = {
 
 		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
 		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
+		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
 		settingRow.hasR2 = !!c.env.r2
 
 		let regVerifyOpen = false
@@ -96,6 +98,13 @@ const settingService = {
 
 	async set(c, params) {
 		const settingData = await this.query(c);
+
+		if (params.tgBotToken !== undefined) {
+			const nextToken = typeof params.tgBotToken === 'string' ? params.tgBotToken.trim() : params.tgBotToken;
+			if (!nextToken || String(nextToken).includes('******')) {
+				delete params.tgBotToken;
+			}
+		}
 
 		// Handle resendTokens
 		if (params.resendTokens) {
@@ -174,11 +183,12 @@ const settingService = {
 			autoRefreshTime: settingRow.autoRefreshTime,
 			addEmailVerify: settingRow.addEmailVerify,
 			registerVerify: settingRow.registerVerify,
-			send: settingRow.send,
-			r2Domain: settingRow.r2Domain,
-			siteKey: settingRow.siteKey,
-			background: settingRow.background,
-			loginOpacity: settingRow.loginOpacity,
+				send: settingRow.send,
+				r2Domain: settingRow.r2Domain,
+				customDomain: settingRow.customDomain,
+				siteKey: settingRow.siteKey,
+				background: settingRow.background,
+				loginOpacity: settingRow.loginOpacity,
 			domainList: settingRow.domainList,
 			regKey: settingRow.regKey,
 			regVerifyOpen: settingRow.regVerifyOpen,
@@ -188,12 +198,34 @@ const settingService = {
 			noticeType: settingRow.noticeType,
 			noticeDuration: settingRow.noticeDuration,
 			noticePosition: settingRow.noticePosition,
-			noticeWidth: settingRow.noticeWidth,
-			noticeOffset: settingRow.noticeOffset,
-			notice: settingRow.notice,
-			loginDomain: settingRow.loginDomain
-		};
-	}
+				noticeWidth: settingRow.noticeWidth,
+				noticeOffset: settingRow.noticeOffset,
+				notice: settingRow.notice,
+				loginDomain: settingRow.loginDomain,
+				tgMsgFrom: settingRow.tgMsgFrom,
+				tgMsgTo: settingRow.tgMsgTo,
+				tgMsgText: settingRow.tgMsgText
+			};
+		}
 };
 
 export default settingService;
+
+function applyTelegramSettingDefaults(setting) {
+	if (!setting) {
+		return;
+	}
+
+	if (setting.customDomain === undefined || setting.customDomain === null) {
+		setting.customDomain = '';
+	}
+	if (!setting.tgMsgFrom) {
+		setting.tgMsgFrom = 'only-name';
+	}
+	if (!setting.tgMsgTo) {
+		setting.tgMsgTo = 'show';
+	}
+	if (!setting.tgMsgText) {
+		setting.tgMsgText = 'hide';
+	}
+}

@@ -21,12 +21,32 @@ const init = {
 		await this.v1_5DB(c);
 		await this.v1_6DB(c);
 		await this.v1_7DB(c);
-		await this.v2DB(c);
-		await this.v2_1DB(c);
-		await this.v2_2DB(c);
-		await settingService.refresh(c);
-		return c.text(t('initSuccess'));
-	},
+			await this.v2DB(c);
+			await this.v2_1DB(c);
+			await this.v2_2DB(c);
+			await this.v2_3DB(c);
+			await settingService.refresh(c);
+			return c.text(t('initSuccess'));
+		},
+
+		async v2_3DB(c) {
+			const addColumnSqlList = [
+				`ALTER TABLE setting ADD COLUMN custom_domain TEXT NOT NULL DEFAULT '';`,
+				`ALTER TABLE setting ADD COLUMN tg_msg_from TEXT NOT NULL DEFAULT 'only-name';`,
+				`ALTER TABLE setting ADD COLUMN tg_msg_to TEXT NOT NULL DEFAULT 'show';`,
+				`ALTER TABLE setting ADD COLUMN tg_msg_text TEXT NOT NULL DEFAULT 'hide';`,
+			];
+
+			const promises = addColumnSqlList.map(async (sql) => {
+				try {
+					await c.env.db.prepare(sql).run();
+				} catch (e) {
+					console.warn(`跳过 Telegram 字段添加，原因：${e.message}`);
+				}
+			});
+
+			await Promise.all(promises);
+		},
 
 	async v2_2DB(c) {
 		// 添加 to_email 索引，优化按收件邮箱查询性能
