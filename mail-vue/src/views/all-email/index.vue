@@ -33,6 +33,7 @@
                 <el-option key="4" :label="$t('subject')" :value="'subject'"/>
                 <el-option key="1" :label="$t('user')" :value="'user'"/>
                 <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
+                <el-option key="5" :label="$t('content')" :value="'content'"/>
               </el-select>
               <div class="search-type">
                 <span>{{ selectTitle }}</span>
@@ -98,6 +99,7 @@ import {Icon} from "@iconify/vue";
 import router from "@/router/index.js";
 import {useI18n} from 'vue-i18n';
 import {toUtc} from "@/utils/day.js";
+import {applyAllEmailSearchType} from "./search-utils.js";
 
 defineOptions({
   name: 'all-email'
@@ -123,6 +125,7 @@ const params = reactive({
   accountEmail: null,
   name: null,
   subject: null,
+  content: null,
   searchType: 'name'
 })
 
@@ -157,6 +160,7 @@ const selectTitle = computed(() => {
   if (params.searchType === 'account') return t('selectEmail')
   if (params.searchType === 'name') return t('sender')
   if (params.searchType === 'subject') return t('subject')
+  if (params.searchType === 'content') return t('content')
 })
 
 const paramsStar = localStorage.getItem('all-email-params')
@@ -222,32 +226,12 @@ function refreshBefore() {
   params.accountEmail = null
   params.name = null
   params.subject = null
+  params.content = null
   params.searchType = 'name'
 }
 
 function search() {
-
-  params.userEmail = null
-  params.accountEmail = null
-  params.name = null
-  params.subject = null
-
-  if (params.searchType === 'user') {
-    params.userEmail = searchValue.value
-  }
-
-  if (params.searchType === 'account') {
-    params.accountEmail = searchValue.value
-  }
-
-  if (params.searchType === 'name') {
-    params.name = searchValue.value
-  }
-
-  if (params.searchType === 'subject') {
-    params.subject = searchValue.value
-  }
-
+  applyAllEmailSearchType(params, params.searchType, searchValue.value)
   sysEmailScroll.value.refreshList();
 }
 

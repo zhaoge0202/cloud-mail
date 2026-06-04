@@ -21,6 +21,7 @@ import { t } from '../i18n/i18n'
 import r2Service from './r2-service';
 import domainUtils from '../utils/domain-uitls';
 import adminUtils from '../utils/admin-utils';
+import { buildContentLikePattern } from './all-email-filter';
 
 const emailService = {
 
@@ -593,7 +594,7 @@ const emailService = {
 
 	async allList(c, params) {
 
-		let { emailId, size, name, subject, accountEmail, userEmail, type, timeSort } = params;
+		let { emailId, size, name, subject, content, accountEmail, userEmail, type, timeSort } = params;
 
 		size = Number(size);
 
@@ -652,6 +653,10 @@ const emailService = {
 
 		if (subject) {
 			conditions.push(sql`${email.subject} COLLATE NOCASE LIKE ${subject + '%'}`);
+		}
+
+		if (content) {
+			conditions.push(sql`${email.text} COLLATE NOCASE LIKE ${buildContentLikePattern(content)}`);
 		}
 
 		conditions.push(ne(email.status, emailConst.status.SAVING));

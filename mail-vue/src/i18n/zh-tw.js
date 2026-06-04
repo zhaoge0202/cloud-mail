@@ -89,6 +89,7 @@ const zhTW = {
     subject: '主旨',
     sender: '寄件人',
     user: '使用者',
+    content: '內容',
     searchByContent: '輸入文字搜尋',
     noRecipient: '無收件人',
     received: '已收到',
