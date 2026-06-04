@@ -6,6 +6,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { calculateWidthScale } from './scale.js'
 
 const props = defineProps({
   html: {
@@ -17,12 +18,6 @@ const props = defineProps({
 const container = ref(null)
 const contentBox = ref(null)
 let shadowRoot = null
-
-// 确保字体在 Shadow DOM 中可用
-function loadFontInShadow() {
-  const style = document.createElement('style')
-  document.head.appendChild(style)
-}
 
 function updateContent() {
   if (!shadowRoot) return;
@@ -42,7 +37,8 @@ function updateContent() {
         all: initial;
         width: 100%;
         height: 100%;
-        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        font-family: -apple-system, Inter, BlinkMacSystemFont,
+                    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
         color: #13181D;
@@ -72,7 +68,7 @@ function updateContent() {
       }
 
       img:not(table img) {
-        max-width: 100% !important;
+        max-width: 100%;
         height: auto !important;
       }
 
@@ -92,23 +88,15 @@ function autoScale() {
   if (!shadowContent) return
 
   const parentWidth = parent.offsetWidth
-  const parentHeight = parent.offsetHeight
-
   const childWidth = shadowContent.scrollWidth
-  const childHeight = shadowContent.scrollHeight
-
-  if (childWidth === 0 || childHeight === 0) return
-
-  const scaleX = parentWidth / childWidth
-  const scaleY = parentHeight / childHeight
-  const scale = Math.min(scaleX, scaleY)
+  const scale = calculateWidthScale(parentWidth, childWidth)
+  if (scale === null) return
 
   const hostElement = shadowRoot.host
   hostElement.style.zoom = scale
 }
 
 onMounted(() => {
-  loadFontInShadow() // 预加载字体
   shadowRoot = container.value.attachShadow({ mode: 'open' })
   updateContent()
   autoScale()
@@ -125,8 +113,7 @@ watch(() => props.html, () => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: 'HarmonyOS', -apple-system, BlinkMacSystemFont,
-  'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, Inter, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .content-html {

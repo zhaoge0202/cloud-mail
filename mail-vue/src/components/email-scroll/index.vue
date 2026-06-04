@@ -12,6 +12,9 @@
 
         <slot name="first"></slot>
         <Icon class="icon reload" icon="ion:reload" width="18" height="18" @click="refresh"/>
+        <Icon v-perm="'email:delete'" class="icon" icon="fluent:mail-read-20-regular" width="21" height="21"
+              v-if="getSelectedMailsIds().length > 0 && showUnread"
+              @click="handleRead"/>
         <Icon v-perm="'email:delete'" class="icon" icon="uiw:delete" width="16" height="16"
               v-if="getSelectedMailsIds().length > 0"
               @click="handleDelete"/>
@@ -42,7 +45,7 @@
               <div v-if="!showStar"></div>
               <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
 
-                <div class="email-sender" :style=" showStatus ? 'gap: 10px;' : ''">
+                <div class="email-sender" :style="(showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : '')">
                   <div class="email-status" v-if="showStatus">
                     <el-tooltip v-if="item.status ===  0" effect="dark" :content="$t('received')">
                       <Icon icon="ic:round-mark-email-read" style="color: #51C76B" width="20" height="20"/>
@@ -75,6 +78,7 @@
                   <div v-else></div>
                   <span class="name">
                     <span>
+                      <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread)"/>
                       <slot name="name" :email="item"> {{ item.name }}</slot>
                     </span>
                     <span>
@@ -85,7 +89,8 @@
                 </div>
                 <div>
                   <div class="email-text">
-                    <span class="email-subject">
+                    <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">
+                      <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread)"/>
                       <slot name="subject" :email="item">
                         {{ item.subject || '\u200B' }}
                       </slot>
@@ -109,7 +114,7 @@
                 </div>
               </div>
               <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
-                <span class="email-time">{{ fromNow(item.createTime) }}</span>
+                <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ fromNow(item.createTime) }}</span>
               </div>
             </div>
           </div>
@@ -170,10 +175,13 @@ import {useSettingStore} from "@/store/setting.js";
 import {sleep} from "@/utils/time-utils.js"
 import {fromNow} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
+import {EmailUnreadEnum} from "@/enums/email-enum.js";
+import {markEmailListReadLocally} from "./unread-utils.js";
 
 const props = defineProps({
   getEmailList: Function,
   emailDelete: Function,
+  emailRead: Function,
   starAdd: Function,
   starCancel: Function,
   cancelSuccess: Function,
@@ -217,6 +225,10 @@ const props = defineProps({
   showFirstLoading: {
     type: Boolean,
     default: true
+  },
+  showUnread: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -370,6 +382,16 @@ function starChange(email) {
 
 function changeAccountShow() {
   uiStore.accountShow = !uiStore.accountShow;
+}
+
+const handleRead = () => {
+  const emailIds = getSelectedMailsIds();
+  props.emailRead?.(emailIds);
+  localRead(emailIds);
+}
+
+function localRead(emailIds) {
+  markEmailListReadLocally(emailList, emailIds, EmailUnreadEnum.READ);
 }
 
 const handleDelete = () => {
@@ -728,6 +750,8 @@ function loadData() {
         }
 
         > span:first-child {
+          display: flex;
+          align-items: center;
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
@@ -783,6 +807,8 @@ function loadData() {
       }
 
       .email-subject {
+        display: flex;
+        align-items: center;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -803,6 +829,18 @@ function loadData() {
         }
       }
     }
+  }
+
+  .unread {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--el-color-primary);
+    margin-right: 6px;
+    position: relative;
+    top: -1px;
   }
 
 

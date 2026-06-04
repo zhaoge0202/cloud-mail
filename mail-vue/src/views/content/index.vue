@@ -74,10 +74,10 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
-import {reactive, ref, watch} from "vue";
+import {onMounted, onUnmounted, reactive, ref, watch} from "vue";
 import {useRouter} from 'vue-router'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {emailDelete} from "@/request/email.js";
+import {emailDelete, emailRead} from "@/request/email.js";
 import {Icon} from "@iconify/vue";
 import {useEmailStore} from "@/store/email.js";
 import {useAccountStore} from "@/store/account.js";
@@ -90,6 +90,8 @@ import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
+import {EmailUnreadEnum} from "@/enums/email-enum.js";
+import {shouldAutoMarkRead} from "@/components/email-scroll/unread-utils.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -105,6 +107,17 @@ watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
 
+onMounted(() => {
+  if (shouldAutoMarkRead(emailStore.contentData.showUnread, email.unread, EmailUnreadEnum.UNREAD)) {
+    email.unread = EmailUnreadEnum.READ;
+    emailRead([email.emailId]);
+  }
+})
+
+onUnmounted(() => {
+  emailStore.contentData.showUnread = false;
+})
+
 function openReply() {
   uiStore.writerRef.openReply(email)
 }
@@ -116,7 +129,6 @@ function toMessage(message) {
 function formatImage(content) {
   content = content || '';
   const domain = settingStore.settings.r2Domain;
-  console.log(domain)
   return  content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
 }
 

@@ -4,9 +4,11 @@
                :star-success="addStar"
                :getEmailList="getEmailList"
                :emailDelete="emailDelete"
+               :email-read="emailRead"
                :star-add="starAdd"
                :star-cancel="starCancel"
                :time-sort="params.timeSort"
+               :show-unread="true"
                actionLeft="4px"
                @jump="jumpContent"
   >
@@ -25,7 +27,7 @@ import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailLatest} from "@/request/email.js";
+import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
@@ -62,6 +64,7 @@ function changeTimeSort() {
 function jumpContent(email) {
   emailStore.contentData.email = email
   emailStore.contentData.delType = 'logic'
+  emailStore.contentData.showUnread = true
   emailStore.contentData.showStar = true
   emailStore.contentData.showReply = true
   router.push('/message')

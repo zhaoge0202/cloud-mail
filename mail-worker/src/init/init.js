@@ -25,8 +25,23 @@ const init = {
 			await this.v2_1DB(c);
 			await this.v2_2DB(c);
 			await this.v2_3DB(c);
+			await this.v2_4DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_4DB(c) {
+			try {
+				await c.env.db.prepare(`ALTER TABLE email ADD COLUMN unread INTEGER NOT NULL DEFAULT 0;`).run();
+			} catch (e) {
+				console.warn(`跳过 unread 字段添加，原因：${e.message}`);
+			}
+
+			try {
+				await c.env.db.prepare(`UPDATE email SET unread = 1;`).run();
+			} catch (e) {
+				console.warn(`跳过 unread 回填，原因：${e.message}`);
+			}
 		},
 
 		async v2_3DB(c) {

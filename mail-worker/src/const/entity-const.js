@@ -42,6 +42,10 @@ export const emailConst = {
 		DELAYED: 5,
 		SAVING: 6,
 		NOONE: 7
+	},
+	unread: {
+		UNREAD: 0,
+		READ: 1
 	}
 }
 

@@ -22,6 +22,7 @@ import r2Service from './r2-service';
 import domainUtils from '../utils/domain-uitls';
 import adminUtils from '../utils/admin-utils';
 import { buildContentLikePattern } from './all-email-filter';
+import { resolveUnreadValue } from './email-unread';
 
 const emailService = {
 
@@ -128,6 +129,7 @@ const emailService = {
 
 	receive(c, params, cidAttList, r2domain) {
 		params.content = this.imgReplace(params.content, cidAttList, r2domain)
+		params.unread = resolveUnreadValue(params.type, emailConst.type.RECEIVE, emailConst.unread.READ)
 		return orm(c).insert(email).values({ ...params }).returning().get();
 	},
 
@@ -393,16 +395,17 @@ const emailService = {
 
 		html = this.imgReplace(html, null, r2Domain);
 
-		const emailData = {};
-		emailData.sendEmail = accountRow.email;
-		emailData.name = name;
+			const emailData = {};
+			emailData.sendEmail = accountRow.email;
+			emailData.name = name;
 		emailData.subject = subject;
 		emailData.content = html;
 		emailData.text = text;
 		emailData.accountId = accountId;
-		emailData.type = emailConst.type.SEND;
-		emailData.userId = userId;
-		emailData.status = emailConst.status.SENT;
+			emailData.type = emailConst.type.SEND;
+			emailData.userId = userId;
+			emailData.status = emailConst.status.SENT;
+			emailData.unread = emailConst.unread.READ;
 
 		const emailDataList = [];
 
@@ -710,6 +713,21 @@ const emailService = {
 			isDel: isDel.NORMAL,
 			status: status
 		}).where(eq(email.emailId, emailId)).returning().get();
+	},
+
+	async read(c, params, userId) {
+		const emailIds = Array.isArray(params.emailIds) ? params.emailIds.map(Number).filter((id) => !Number.isNaN(id)) : [];
+		if (emailIds.length === 0) {
+			return;
+		}
+
+		await orm(c).update(email).set({
+			unread: emailConst.unread.READ
+		}).where(and(
+			eq(email.userId, userId),
+			eq(email.type, emailConst.type.RECEIVE),
+			inArray(email.emailId, emailIds)
+		)).run();
 	},
 
 	async batchDelete(c, params) {

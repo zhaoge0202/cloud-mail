@@ -22,6 +22,7 @@ export const email = sqliteTable('email', {
 	resendEmailId: text('resend_email_id'),
 	smtp2goEmailId: text('smtp2go_email_id'),
 	message: text('message'),
+	unread: integer('unread').default(0).notNull(),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
 	isDel: integer('is_del').default(0).notNull()
 });
