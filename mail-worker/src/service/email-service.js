@@ -22,7 +22,7 @@ import r2Service from './r2-service';
 import domainUtils from '../utils/domain-uitls';
 import adminUtils from '../utils/admin-utils';
 import { buildContentLikePattern } from './all-email-filter';
-import { resolveUnreadValue } from './email-unread';
+import { applyReceiveDefaults } from './email-unread';
 
 const emailService = {
 
@@ -129,7 +129,7 @@ const emailService = {
 
 	receive(c, params, cidAttList, r2domain) {
 		params.content = this.imgReplace(params.content, cidAttList, r2domain)
-		params.unread = resolveUnreadValue(params.type, emailConst.type.RECEIVE, emailConst.unread.READ)
+		applyReceiveDefaults(params, emailConst.type.RECEIVE, emailConst.unread.READ)
 		return orm(c).insert(email).values({ ...params }).returning().get();
 	},
 
@@ -727,6 +727,23 @@ const emailService = {
 			eq(email.userId, userId),
 			eq(email.type, emailConst.type.RECEIVE),
 			inArray(email.emailId, emailIds)
+		)).run();
+	},
+
+	async readAll(c, params, userId) {
+		const accountId = Number(params.accountId);
+		if (Number.isNaN(accountId) || accountId <= 0) {
+			return;
+		}
+
+		await orm(c).update(email).set({
+			unread: emailConst.unread.READ
+		}).where(and(
+			eq(email.userId, userId),
+			eq(email.accountId, accountId),
+			eq(email.type, emailConst.type.RECEIVE),
+			eq(email.isDel, isDel.NORMAL),
+			eq(email.unread, emailConst.unread.UNREAD)
 		)).run();
 	},
 

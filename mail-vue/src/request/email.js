@@ -16,6 +16,10 @@ export function emailRead(emailIds) {
     return http.put('/email/read', {emailIds})
 }
 
+export function emailReadAll(accountId) {
+    return http.put('/email/readAll', {accountId})
+}
+
 export function emailSend(form,progress) {
     return http.post('/email/send', form,{
         onUploadProgress: (e) => {

@@ -12,6 +12,9 @@
 
         <slot name="first"></slot>
         <Icon class="icon reload" icon="ion:reload" width="18" height="18" @click="refresh"/>
+        <Icon v-perm="'email:delete'" class="icon" icon="material-symbols:mark-email-read-outline-rounded" width="22" height="22"
+              v-if="emailList.length > 0 && showUnread"
+              @click="handleReadAll"/>
         <Icon v-perm="'email:delete'" class="icon" icon="fluent:mail-read-20-regular" width="21" height="21"
               v-if="getSelectedMailsIds().length > 0 && showUnread"
               @click="handleRead"/>
@@ -34,6 +37,7 @@
           <div v-if="(skeleton && !loading)" v-for="item in emailList" :key="item.emailId">
             <div class="email-row"
                  :data-checked="item.checked"
+                 :data-unread="item.unread === EmailUnreadEnum.UNREAD && showUnread"
                  @click="jumpDetails(item)"
             >
               <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
@@ -176,12 +180,17 @@ import {sleep} from "@/utils/time-utils.js"
 import {fromNow} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
-import {markEmailListReadLocally} from "./unread-utils.js";
+import {markAllEmailListReadLocally, markEmailListReadLocally} from "./unread-utils.js";
 
 const props = defineProps({
   getEmailList: Function,
   emailDelete: Function,
   emailRead: Function,
+  emailReadAll: Function,
+  currentAccountId: {
+    type: Number,
+    default: 0
+  },
   starAdd: Function,
   starCancel: Function,
   cancelSuccess: Function,
@@ -382,6 +391,14 @@ function starChange(email) {
 
 function changeAccountShow() {
   uiStore.accountShow = !uiStore.accountShow;
+}
+
+const handleReadAll = () => {
+  props.emailReadAll?.(props.currentAccountId);
+  markAllEmailListReadLocally(emailList, EmailUnreadEnum.READ);
+  checkAll.value = false;
+  isIndeterminate.value = false;
+  refreshList();
 }
 
 const handleRead = () => {
@@ -865,6 +882,11 @@ function loadData() {
   &:hover {
     background-color: var(--email-hover-background);
     z-index: 0;
+  }
+
+  &[data-unread="true"] {
+    background: color-mix(in srgb, var(--choose-account-background) 52%, transparent);
+    box-shadow: inset 3px 0 0 0 var(--el-color-primary), var(--header-actions-border);
   }
 
   /*&[data-checked="true"] {

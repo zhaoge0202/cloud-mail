@@ -11,3 +11,10 @@ export function markEmailListReadLocally(emailList, emailIds, readValue) {
 		}
 	});
 }
+
+export function markAllEmailListReadLocally(emailList, readValue) {
+	emailList.forEach((email) => {
+		email.unread = readValue;
+		email.checked = false;
+	});
+}
