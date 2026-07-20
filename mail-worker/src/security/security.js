@@ -24,6 +24,13 @@ const exclude = [
 	'/user/token/revoke'
 ];
 
+const excludePrefixPaths = new Set([
+	'/file',
+	'/init',
+	'/inbound',
+	'/telegram'
+]);
+
 const requirePerms = [
 	'/email/send',
 	'/email/delete',
@@ -98,7 +105,7 @@ app.use('*', async (c, next) => {
 	}
 
 	const index = exclude.findIndex(item => {
-		return path.startsWith(item);
+		return isExcludePath(path, item);
 	});
 
 	console.log('[Security] Exclude index:', index, 'for path:', path);
@@ -226,5 +233,12 @@ function permKeyToPaths(permKeys) {
 		}
 	}
 	return paths;
+}
+
+function isExcludePath(path, excludePath) {
+	if (excludePrefixPaths.has(excludePath)) {
+		return path === excludePath || path.startsWith(`${excludePath}/`);
+	}
+	return path === excludePath;
 }
 

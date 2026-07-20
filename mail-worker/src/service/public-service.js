@@ -10,12 +10,13 @@ import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
 import reqUtils from '../utils/req-utils';
 import dayjs from 'dayjs';
-import { isDel, roleConst } from '../const/entity-const';
+import { isDel, roleConst, settingConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
 import adminUtils from '../utils/admin-utils';
 import accountService from './account-service';
+import settingService from './setting-service';
 
 const publicService = {
 
@@ -97,9 +98,14 @@ const publicService = {
 	},
 
 	async addUser(c, params) {
-		const { list } = params;
+		const { list } = params || {};
 
-		if (list.length === 0) return;
+		if (!Array.isArray(list) || list.length === 0) return;
+
+		const { register } = await settingService.query(c);
+		if (register === settingConst.register.CLOSE) {
+			throw new BizError(t('regDisabled'), 403);
+		}
 
 		for (const emailRow of list) {
 			if (!verifyUtils.isEmail(emailRow.email)) {
@@ -110,9 +116,20 @@ const publicService = {
 				throw new BizError(t('notEmailDomain'));
 			}
 
-			const { salt, hash } = await saltHashUtils.hashPassword(
-				emailRow.password || cryptoUtils.genRandomPwd()
-			);
+			const password = emailRow.password || cryptoUtils.genRandomPwd();
+			if (typeof password !== 'string') {
+				throw new BizError(t('pwdMinLengthLimit'));
+			}
+
+			if (password.length > 30) {
+				throw new BizError(t('pwdLengthLimit'));
+			}
+
+			if (password.length < 6) {
+				throw new BizError(t('pwdMinLengthLimit'));
+			}
+
+			const { salt, hash } = await saltHashUtils.hashPassword(password);
 
 			emailRow.salt = salt;
 			emailRow.hash = hash;
@@ -137,18 +154,16 @@ const publicService = {
 				type = roleRow ? roleRow.roleId : type;
 			}
 
-			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
+			userList.push(c.env.db.prepare(`
+				INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`).bind(email, hash, salt, type, os, browser, activeIp, activeIp, device, activeTime, activeTime));
 
-			const accountSql = `INSERT INTO account (email, name, user_id)
-			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;
-
-			userList.push(c.env.db.prepare(userSql));
-			userList.push(c.env.db.prepare(accountSql));
-
+			userList.push(c.env.db.prepare(`
+				INSERT INTO account (email, name, user_id)
+				VALUES (?, ?, (SELECT user_id FROM user WHERE email = ?))
+			`).bind(email, emailUtils.getName(email), email));
 		}
-
-		userList.push(c.env.db.prepare(`UPDATE account SET user_id = (SELECT user_id FROM user WHERE user.email = account.email) WHERE user_id = 0;`))
 
 		try {
 			await c.env.db.batch(userList);

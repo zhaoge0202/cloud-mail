@@ -98,6 +98,7 @@ const settingService = {
 
 	async set(c, params) {
 		const settingData = await this.query(c);
+		params = pickSettingUpdateParams(params);
 
 		if (params.tgBotToken !== undefined) {
 			const nextToken = typeof params.tgBotToken === 'string' ? params.tgBotToken.trim() : params.tgBotToken;
@@ -122,6 +123,10 @@ const settingService = {
 				if (!smtp2goTokens[domain]) delete smtp2goTokens[domain];
 			});
 			params.smtp2goTokens = JSON.stringify(smtp2goTokens);
+		}
+
+		if (Object.keys(params).length === 0) {
+			return;
 		}
 
 		await orm(c).update(setting).set({ ...params }).returning().get();
@@ -210,6 +215,65 @@ const settingService = {
 };
 
 export default settingService;
+
+const SETTING_UPDATE_FIELDS = new Set([
+	'register',
+	'receive',
+	'title',
+	'manyEmail',
+	'addEmail',
+	'autoRefreshTime',
+	'addEmailVerify',
+	'registerVerify',
+	'regVerifyCount',
+	'addVerifyCount',
+	'send',
+	'r2Domain',
+	'secretKey',
+	'siteKey',
+	'regKey',
+	'background',
+	'tgBotToken',
+	'tgChatId',
+	'tgBotStatus',
+	'customDomain',
+	'tgMsgFrom',
+	'tgMsgTo',
+	'tgMsgText',
+	'forwardEmail',
+	'forwardStatus',
+	'ruleEmail',
+	'ruleType',
+	'loginOpacity',
+	'resendTokens',
+	'smtp2goTokens',
+	'noticeTitle',
+	'noticeContent',
+	'noticeType',
+	'noticeDuration',
+	'noticePosition',
+	'noticeOffset',
+	'noticeWidth',
+	'notice',
+	'noRecipient',
+	'loginDomain',
+	'bucket',
+	'region',
+	'endpoint',
+	's3AccessKey',
+	's3SecretKey'
+]);
+
+export function pickSettingUpdateParams(params = {}) {
+	const nextParams = {};
+	const sourceParams = params || {};
+	Object.keys(sourceParams).forEach(key => {
+		if (SETTING_UPDATE_FIELDS.has(key)) {
+			nextParams[key] = sourceParams[key];
+		}
+	});
+	return nextParams;
+}
 
 function applyTelegramSettingDefaults(setting) {
 	if (!setting) {

@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
 export const setting = sqliteTable('setting', {
-	register: integer('register').default(0).notNull(),
+	register: integer('register').default(1).notNull(),
 	receive: integer('receive').default(0).notNull(),
 	title: text('title').default('').notNull(),
 	manyEmail: integer('many_email').default(1).notNull(),
