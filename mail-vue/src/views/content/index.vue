@@ -24,7 +24,15 @@
                   <span><{{ email.sendEmail }}></span>
                 </div>
               </div>
-              <div class="receive"><span class="source">{{$t('recipient')}}</span><span class="receive-email">{{  formateReceive(email.recipient) }}</span></div>
+              <div class="receive"><span class="source">{{$t('recipient')}}</span><span class="receive-email">{{ formatReceive(email.recipient) }}</span></div>
+              <div class="receive" v-if="email.envelopeFrom">
+                <span class="source">{{$t('actualSender')}}</span>
+                <span class="receive-email">{{ email.envelopeFrom }}</span>
+              </div>
+              <div class="receive" v-if="email.toEmail">
+                <span class="source">{{$t('actualRecipient')}}</span>
+                <span class="receive-email">{{ email.toEmail }}</span>
+              </div>
               <div class="date">
                 <div>{{ formatDetailDate(email.createTime) }}</div>
               </div>
@@ -144,9 +152,29 @@ function isImage(filename) {
   return ['png', 'jpg', 'jpeg', 'bmp', 'gif','jfif'].includes(getExtName(filename))
 }
 
-function formateReceive(recipient) {
-  recipient = JSON.parse(recipient)
-  return recipient.map(item => item.address).join(', ')
+function formatReceive(recipient) {
+  if (!recipient) return ''
+  if (Array.isArray(recipient)) {
+    return recipient.map(formatAddress).filter(Boolean).join(', ')
+  }
+  if (typeof recipient !== 'string') {
+    return formatAddress(recipient)
+  }
+  try {
+    const parsedRecipient = JSON.parse(recipient)
+    if (Array.isArray(parsedRecipient)) {
+      return parsedRecipient.map(formatAddress).filter(Boolean).join(', ')
+    }
+    return formatAddress(parsedRecipient)
+  } catch (e) {
+    return recipient
+  }
+}
+
+function formatAddress(address) {
+  if (!address) return ''
+  if (typeof address === 'string') return address
+  return address.address || ''
 }
 
 function changeStar() {

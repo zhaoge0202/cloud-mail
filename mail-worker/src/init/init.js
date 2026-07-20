@@ -26,8 +26,17 @@ const init = {
 			await this.v2_2DB(c);
 			await this.v2_3DB(c);
 			await this.v2_4DB(c);
+			await this.v2_5DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_5DB(c) {
+			try {
+				await c.env.db.prepare(`ALTER TABLE email ADD COLUMN envelope_from TEXT NOT NULL DEFAULT '';`).run();
+			} catch (e) {
+				console.warn(`跳过 envelope_from 字段添加，原因：${e.message}`);
+			}
 		},
 
 		async v2_4DB(c) {
@@ -464,6 +473,7 @@ const init = {
       CREATE TABLE IF NOT EXISTS email (
         email_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         send_email TEXT,
+        envelope_from TEXT NOT NULL DEFAULT '',
         name TEXT,
         account_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,

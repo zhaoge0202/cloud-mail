@@ -117,6 +117,8 @@ const en = {
     roleDesc: 'Role',
     noSubject: 'No subject',
     recipient: 'To',
+    actualSender: 'Actual sender',
+    actualRecipient: 'Actual recipient',
     delivered: 'Delivered',
     complained: 'Complained',
     delayed: 'Delayed',

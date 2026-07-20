@@ -117,6 +117,8 @@ const zhTW = {
     roleDesc: '角色',
     noSubject: '無主旨',
     recipient: '收件人',
+    actualSender: '實際寄送地址',
+    actualRecipient: '實際投遞地址',
     delivered: '已投遞',
     complained: '已申訴',
     delayed: '已延遲',

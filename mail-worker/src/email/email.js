@@ -112,6 +112,7 @@ export async function email(message, env, ctx) {
 			toEmail: message.to,
 			toName: toName,
 			sendEmail: email.from.address,
+			envelopeFrom: message.from || '',
 			name: email.from.name || emailUtils.getName(email.from.address),
 			subject: email.subject,
 			content: email.html,

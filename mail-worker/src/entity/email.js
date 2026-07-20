@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 export const email = sqliteTable('email', {
 	emailId: integer('email_id').primaryKey({ autoIncrement: true }),
 	sendEmail: text('send_email'),
+	envelopeFrom: text('envelope_from').default('').notNull(),
 	name: text('name'),
 	accountId: integer('account_id').notNull(),
 	userId: integer('user_id').notNull(),
