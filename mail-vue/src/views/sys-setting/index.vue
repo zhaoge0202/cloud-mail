@@ -126,29 +126,6 @@
                 </div>
               </div>
               <div class="setting-item">
-                <div>
-                  <span>{{ $t('autoRefresh') }}</span>
-                  <el-tooltip effect="dark" :content="$t('autoRefreshDesc')">
-                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
-                  </el-tooltip>
-                </div>
-                <div>
-                  <el-select
-                      @change="change"
-                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
-                      v-model="setting.autoRefreshTime"
-                      placeholder="Select"
-                  >
-                    <el-option
-                        v-for="item in options"
-                        :key="item.value"
-                        :label="item.label"
-                        :value="item.value"
-                    />
-                  </el-select>
-                </div>
-              </div>
-              <div class="setting-item">
                 <div><span>{{ $t('sendEmail') }}</span></div>
                 <div>
                   <el-switch @change="change" :before-change="beforeChange" :active-value="0" :inactive-value="1"
@@ -825,16 +802,6 @@ const regKeyOptions = computed(() => [
   {label: t('enable'), value: 0},
   {label: t('disable'), value: 1},
   {label: t('optional'), value: 2},
-])
-
-const options = computed(() => [
-  {label: t('disable'), value: 0},
-  {label: '3s', value: 3},
-  {label: '5s', value: 5},
-  {label: '7s', value: 7},
-  {label: '10s', value: 10},
-  {label: '15s', value: 15},
-  {label: '20s', value: 20}
 ])
 
 const tgChatId = ref([])

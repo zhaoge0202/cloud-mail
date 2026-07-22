@@ -27,8 +27,31 @@ const init = {
 			await this.v2_3DB(c);
 			await this.v2_4DB(c);
 			await this.v2_5DB(c);
+			await this.v2_6DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_6DB(c) {
+			// 收件箱轮询/列表、全部邮件列表的复合索引，降低 D1 扫行
+			const indexSqlList = [
+				`CREATE INDEX IF NOT EXISTS idx_email_inbox ON email(user_id, account_id, type, is_del, email_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_email_all ON email(type, status, email_id);`
+			];
+			for (const sql of indexSqlList) {
+				try {
+					await c.env.db.prepare(sql).run();
+				} catch (e) {
+					console.warn(`跳过索引创建，原因：${e.message}`);
+				}
+			}
+
+			// 关闭自动刷新（已有手动刷新按钮，默认轮询浪费 D1 读配额）
+			try {
+				await c.env.db.prepare(`UPDATE setting SET auto_refresh_time = 0;`).run();
+			} catch (e) {
+				console.warn(`跳过关闭自动刷新，原因：${e.message}`);
+			}
 		},
 
 		async v2_5DB(c) {

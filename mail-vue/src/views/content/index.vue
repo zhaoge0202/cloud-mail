@@ -119,8 +119,13 @@ watch(() => accountStore.currentAccountId, () => {
 })
 
 onMounted(async () => {
-  // 轮询插入的轻量邮件没有正文/附件，打开详情时再补全
-  if (email?.emailId && !email.content && !email.text) {
+  // 列表轻量化后无完整正文/附件，打开详情时按需补全
+  const needDetail = email?.emailId && (
+    !email.content ||
+    email.content === '' ||
+    !Array.isArray(email.attList)
+  )
+  if (needDetail) {
     detailLoading.value = true
     try {
       const detail = await emailDetail(email.emailId)

@@ -33,6 +33,8 @@ const emailService = {
 		size = Number(size);
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
+		accountId = Number(accountId);
+		type = Number(type);
 
 		if (size > 30) {
 			size = 30;
@@ -48,10 +50,26 @@ const emailService = {
 
 		}
 
-
+		// 列表只返回展示字段：不读 content（整封 HTML），正文预览用 text 截断
 		const query = orm(c)
 			.select({
-				...email,
+				emailId: email.emailId,
+				sendEmail: email.sendEmail,
+				envelopeFrom: email.envelopeFrom,
+				name: email.name,
+				accountId: email.accountId,
+				userId: email.userId,
+				subject: email.subject,
+				// SQLite substr 截断，避免把整封纯文本带回列表
+				text: sql`substr(coalesce(${email.text}, ''), 1, 200)`,
+				toEmail: email.toEmail,
+				toName: email.toName,
+				type: email.type,
+				status: email.status,
+				message: email.message,
+				unread: email.unread,
+				createTime: email.createTime,
+				isDel: email.isDel,
 				starId: star.starId
 			})
 			.from(email)
@@ -89,7 +107,10 @@ const emailService = {
 			)
 		).get();
 
-		const latestEmailQuery = orm(c).select().from(email).where(
+		// 水位只需要 emailId
+		const latestEmailQuery = orm(c).select({
+			emailId: email.emailId
+		}).from(email).where(
 			and(
 				eq(email.accountId, accountId),
 				eq(email.userId, userId),
@@ -102,17 +123,13 @@ const emailService = {
 
 		list = list.map(item => ({
 			...item,
+			content: '',
+			cc: '[]',
+			bcc: '[]',
+			recipient: '',
+			attList: [],
 			isStar: item.starId != null ? 1 : 0
 		}));
-
-		const emailIds = list.map(item => item.emailId);
-
-		const attsList = await attService.selectByEmailIds(c, emailIds);
-
-		list.forEach(emailRow => {
-			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
-			emailRow.attList = atts;
-		});
 
 		return { list, total: totalRow.total, latestEmail };
 	},

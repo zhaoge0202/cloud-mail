@@ -27,12 +27,10 @@
 <script setup>
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
-import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailLatest, emailRead, emailReadAll} from "@/request/email.js";
+import {emailList, emailDelete, emailRead, emailReadAll} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, onMounted, reactive, ref, watch} from "vue";
-import {sleep} from "@/utils/time-utils.js";
 import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 
@@ -42,7 +40,6 @@ defineOptions({
 
 const emailStore = useEmailStore();
 const accountStore = useAccountStore();
-const settingStore = useSettingStore();
 const scroll = ref({})
 const params = reactive({
   timeSort: 0,
@@ -50,7 +47,6 @@ const params = reactive({
 
 onMounted(() => {
   emailStore.emailScroll = scroll;
-  latest()
 })
 
 
@@ -72,36 +68,6 @@ function jumpContent(email) {
   router.push('/message')
 }
 
-const existIds = new Set();
-
-async function latest() {
-  while (true) {
-    const latestId = scroll.value.latestEmail?.emailId || 0
-
-    if (!scroll.value.firstLoad && settingStore.settings.autoRefreshTime) {
-      try {
-        const accountId = accountStore.currentAccountId
-        const curTimeSort = params.timeSort
-        const list = await emailLatest(latestId, accountId)
-        if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort) {
-          if (list.length > 0) {
-
-            list.forEach(email => {
-              existIds.add(email.emailId)
-              scroll.value.addItem(email)
-            })
-
-          }
-
-        }
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    await sleep(settingStore.settings.autoRefreshTime * 1000)
-  }
-}
-
 function addStar(email) {
   emailStore.starScroll?.addItem(email)
 }
@@ -118,5 +84,11 @@ function getEmailList(emailId, size) {
 <style>
 .icon {
   cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+}
+
+.icon:hover {
+  background: var(--el-menu-hover-bg-color);
 }
 </style>
