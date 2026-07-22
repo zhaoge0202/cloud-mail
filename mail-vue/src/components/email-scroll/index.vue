@@ -24,7 +24,8 @@
       </div>
 
       <div class="header-right">
-        <span class="email-count" v-if="total">{{ $t('emailCount', {total: total}) }}</span>
+        <span class="email-count" v-if="props.type === 'all-email' && emailList.length">{{ $t('loadedEmailCount', {total: emailList.length}) }}</span>
+        <span class="email-count" v-else-if="total">{{ $t('emailCount', {total: total}) }}</span>
         <Icon v-if="showAccountIcon" class="more-icon icon" width="16" height="16" icon="akar-icons:dot-grid-fill"
               @click="changeAccountShow"/>
       </div>
@@ -557,10 +558,21 @@ function getEmailList(refresh = false) {
 
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
-    noLoading.value = data.list.length < queryParam.size;
-    followLoading.value = data.list.length >= queryParam.size;
+    // 方案 A：优先用 hasMore；兼容旧接口用 list.length 推断
+    if (typeof data.hasMore === 'boolean') {
+      noLoading.value = !data.hasMore;
+      followLoading.value = data.hasMore;
+    } else {
+      noLoading.value = data.list.length < queryParam.size;
+      followLoading.value = data.list.length >= queryParam.size;
+    }
 
-    total.value = data.total;
+    // 精确 total 仅旧接口仍返回时使用；全部邮件不再 COUNT
+    if (data.total != null) {
+      total.value = data.total;
+    } else {
+      total.value = 0;
+    }
     queryParam.emailId = data.list.length > 0 ? data.list.at(-1).emailId : 0
   }).finally(() => {
     loading.value = false

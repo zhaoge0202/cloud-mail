@@ -126,6 +126,7 @@ const zhTW = {
     attachments: '附件',
     attCount: '共 {total} 件',
     emailCount: '共 {total} 封',
+    loadedEmailCount: '已載入 {total} 封',
     error404: '404 找不到頁面',
     home: '首頁',
     loginBtn: '登入',

@@ -126,6 +126,7 @@ const zh = {
     attachments: '附件列表',
     attCount: '共 {total} 个',
     emailCount: '共 {total} 封',
+    loadedEmailCount: '已加载 {total} 封',
     error404: '404错误, 找不到页面',
     home: '返回首页',
     loginBtn: '登录',

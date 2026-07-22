@@ -126,6 +126,7 @@ const en = {
     attachments: 'Attachments',
     attCount: 'Total {total}',
     emailCount: 'Total {total}',
+    loadedEmailCount: 'Loaded {total}',
     error404: '404 Not Found',
     home: 'Home',
     loginBtn: 'Sign in',

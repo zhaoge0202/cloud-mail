@@ -733,8 +733,6 @@ const emailService = {
 
 		conditions.push(ne(email.status, emailConst.status.SAVING));
 
-		const countConditions = [...conditions];
-
 		if (timeSort) {
 			conditions.push(gt(email.emailId, emailId));
 		} else {
@@ -742,6 +740,7 @@ const emailService = {
 		}
 
 		// 列表轻量化：不返回 content/全文，text 截断；附件详情再查
+		// 方案 A：LIMIT size+1 判断 hasMore，彻底不做 COUNT(*)
 		const query = orm(c).select({
 			emailId: email.emailId,
 			sendEmail: email.sendEmail,
@@ -765,50 +764,17 @@ const emailService = {
 			.leftJoin(user, eq(email.userId, user.userId))
 			.where(and(...conditions));
 
-		// count 仅在按用户邮箱过滤时才 join user
-		const needUserJoinForCount = !!userEmail;
-		const hasSearchFilter = !!(userEmail || accountEmail || name || subject || content);
-
 		if (timeSort) {
 			query.orderBy(asc(email.emailId));
 		} else {
 			query.orderBy(desc(email.emailId));
 		}
 
-		const listQuery = query.limit(size).all();
+		const rows = await query.limit(size + 1).all();
+		const hasMore = rows.length > size;
+		const pageRows = hasMore ? rows.slice(0, size) : rows;
 
-		// 无搜索条件时缓存 count 60s，避免每次翻页/刷新全表 count
-		const countCacheKey = hasSearchFilter ? null : `all_email_cnt:${type || 'all'}`;
-		let totalPromise;
-		if (countCacheKey) {
-			totalPromise = (async () => {
-				const cached = await c.env.kv.get(countCacheKey);
-				if (cached != null && cached !== '') {
-					return { total: Number(cached) };
-				}
-				const row = await orm(c).select({ total: count() })
-					.from(email)
-					.where(and(...countConditions))
-					.get();
-				await c.env.kv.put(countCacheKey, String(row.total), { expirationTtl: 60 });
-				return row;
-			})();
-		} else {
-			totalPromise = needUserJoinForCount
-				? orm(c).select({ total: count() })
-					.from(email)
-					.leftJoin(user, eq(email.userId, user.userId))
-					.where(and(...countConditions))
-					.get()
-				: orm(c).select({ total: count() })
-					.from(email)
-					.where(and(...countConditions))
-					.get();
-		}
-
-		const [list, totalRow] = await Promise.all([listQuery, totalPromise]);
-
-		const lightList = list.map(item => ({
+		const lightList = pageRows.map(item => ({
 			...item,
 			content: '',
 			cc: '[]',
@@ -817,7 +783,8 @@ const emailService = {
 			attList: []
 		}));
 
-		return { list: lightList, total: totalRow.total };
+		// 不返回精确 total；前端用 hasMore + 已加载条数
+		return { list: lightList, hasMore };
 	},
 
 	async restoreByUserId(c, userId) {
