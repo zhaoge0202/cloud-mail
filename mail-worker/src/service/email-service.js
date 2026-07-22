@@ -21,6 +21,7 @@ import { t } from '../i18n/i18n'
 import r2Service from './r2-service';
 import domainUtils from '../utils/domain-uitls';
 import adminUtils from '../utils/admin-utils';
+import permService from './perm-service';
 import { buildContentLikePattern } from './all-email-filter';
 import { applyReceiveDefaults } from './email-unread';
 
@@ -593,7 +594,7 @@ const emailService = {
 		}));
 	},
 
-	// 详情：按需加载完整正文 + 附件（配合轻量 latest）
+	// 详情：按需加载完整正文 + 附件（收件箱轻量列表 / 全部邮件轻量列表）
 	async detail(c, params, userId) {
 		const emailId = Number(params.emailId);
 		if (!emailId) {
@@ -601,15 +602,24 @@ const emailService = {
 		}
 
 		const emailRow = await orm(c).select().from(email).where(
-			and(
-				eq(email.emailId, emailId),
-				eq(email.userId, userId),
-				eq(email.isDel, isDel.NORMAL)
-			)
+			eq(email.emailId, emailId)
 		).get();
 
 		if (!emailRow) {
 			throw new BizError(t('starNotExistEmail'));
+		}
+
+		const isOwnerNormal = emailRow.userId === userId && emailRow.isDel === isDel.NORMAL;
+		if (!isOwnerNormal) {
+			// 全部邮件（含已删除）需要 all-email:query 或管理员
+			const userRow = await userService.selectById(c, userId);
+			const allowAll = userRow && (
+				adminUtils.isAdmin(c, userRow.email) ||
+				(await permService.userPermKeys(c, userId)).includes('all-email:query')
+			);
+			if (!allowAll) {
+				throw new BizError(t('starNotExistEmail'));
+			}
 		}
 
 		const attsList = await attService.selectByEmailIds(c, [emailId]);
@@ -731,21 +741,33 @@ const emailService = {
 			conditions.push(lt(email.emailId, emailId));
 		}
 
-		const query = orm(c).select({ ...email, userEmail: user.email })
+		// 列表轻量化：不返回 content/全文，text 截断；附件详情再查
+		const query = orm(c).select({
+			emailId: email.emailId,
+			sendEmail: email.sendEmail,
+			envelopeFrom: email.envelopeFrom,
+			name: email.name,
+			accountId: email.accountId,
+			userId: email.userId,
+			subject: email.subject,
+			text: sql`substr(coalesce(${email.text}, ''), 1, 200)`,
+			toEmail: email.toEmail,
+			toName: email.toName,
+			type: email.type,
+			status: email.status,
+			message: email.message,
+			unread: email.unread,
+			createTime: email.createTime,
+			isDel: email.isDel,
+			userEmail: user.email
+		})
 			.from(email)
 			.leftJoin(user, eq(email.userId, user.userId))
 			.where(and(...conditions));
 
-		// count 仅在按用户邮箱过滤时才 join user，避免无过滤时全表 join 扫行
+		// count 仅在按用户邮箱过滤时才 join user
 		const needUserJoinForCount = !!userEmail;
-		const queryCount = needUserJoinForCount
-			? orm(c).select({ total: count() })
-				.from(email)
-				.leftJoin(user, eq(email.userId, user.userId))
-				.where(and(...countConditions))
-			: orm(c).select({ total: count() })
-				.from(email)
-				.where(and(...countConditions));
+		const hasSearchFilter = !!(userEmail || accountEmail || name || subject || content);
 
 		if (timeSort) {
 			query.orderBy(asc(email.emailId));
@@ -754,19 +776,48 @@ const emailService = {
 		}
 
 		const listQuery = query.limit(size).all();
-		const totalQuery = queryCount.get();
 
-		const [list, totalRow] = await Promise.all([listQuery, totalQuery]);
+		// 无搜索条件时缓存 count 60s，避免每次翻页/刷新全表 count
+		const countCacheKey = hasSearchFilter ? null : `all_email_cnt:${type || 'all'}`;
+		let totalPromise;
+		if (countCacheKey) {
+			totalPromise = (async () => {
+				const cached = await c.env.kv.get(countCacheKey);
+				if (cached != null && cached !== '') {
+					return { total: Number(cached) };
+				}
+				const row = await orm(c).select({ total: count() })
+					.from(email)
+					.where(and(...countConditions))
+					.get();
+				await c.env.kv.put(countCacheKey, String(row.total), { expirationTtl: 60 });
+				return row;
+			})();
+		} else {
+			totalPromise = needUserJoinForCount
+				? orm(c).select({ total: count() })
+					.from(email)
+					.leftJoin(user, eq(email.userId, user.userId))
+					.where(and(...countConditions))
+					.get()
+				: orm(c).select({ total: count() })
+					.from(email)
+					.where(and(...countConditions))
+					.get();
+		}
 
-		const emailIds = list.map(item => item.emailId);
-		const attsList = emailIds.length > 0 ? await attService.selectByEmailIds(c, emailIds) : [];
+		const [list, totalRow] = await Promise.all([listQuery, totalPromise]);
 
-		list.forEach(emailRow => {
-			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
-			emailRow.attList = atts;
-		});
+		const lightList = list.map(item => ({
+			...item,
+			content: '',
+			cc: '[]',
+			bcc: '[]',
+			recipient: '',
+			attList: []
+		}));
 
-		return { list: list, total: totalRow.total };
+		return { list: lightList, total: totalRow.total };
 	},
 
 	async restoreByUserId(c, userId) {
