@@ -1,4 +1,4 @@
-name = "cloud-mail"
+name = "zg-wy-mail"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
 keep_vars = true
@@ -8,16 +8,16 @@ enabled = true
 
 [[d1_databases]]
 binding = "db"
-database_name = "cloud-mail" # 数据库的名称
-database_id = "${D1_DATABASE_ID}" # 使用占位符引用环境变量
+database_name = "zhaogemail-sky-d1" # 与 Dashboard 资源名一致
+database_id = "${D1_DATABASE_ID}" # GitHub Secret / 环境变量
 
 [[kv_namespaces]]
 binding = "kv"
-id = "${KV_NAMESPACE_ID}" # 使用占位符引用环境变量
+id = "${KV_NAMESPACE_ID}" # GitHub Secret / 环境变量
 
 [[r2_buckets]]
 binding = "r2"
-bucket_name = "${R2_BUCKET_NAME}" # 使用占位符引用环境变量
+bucket_name = "${R2_BUCKET_NAME}" # 应为 zg-test-chengdu
 
 [assets]
 binding = "assets"		#静态资源绑定名默认不可修改

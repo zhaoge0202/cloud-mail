@@ -76,7 +76,7 @@ jobs:
           grep -A 2 -B 2 "bucket_name" "$CONFIG_FILE" || true
 
           echo "🔒 Setting Worker secrets..."
-          WORKER_NAME="cloud-mail"
+          WORKER_NAME="zg-wy-mail"
           for VAR in DOMAIN ADMIN JWT_SECRET; do
             if [ -n "${!VAR}" ]; then
               VAR_LOWER=$(echo "$VAR" | tr '[:upper:]' '[:lower:]')

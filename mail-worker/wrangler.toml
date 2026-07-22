@@ -1,4 +1,4 @@
-name = "cloud-mail"
+name = "zg-wy-mail"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
 keep_vars = true
@@ -6,34 +6,36 @@ keep_vars = true
 [observability]
 enabled = true
 
-#[[d1_databases]]
-#binding = "db"			#d1数据库绑定名默认不可修改
-#database_name = ""		#d1数据库名字
-#database_id = ""		#d1数据库id
+# 绑定必须以本文件为准，否则每次 deploy 会冲掉 Dashboard 手工绑定
+# D1 / KV 请到 Dashboard 复制 ID 后填入（资源名已按你当前绑定写好）
+[[d1_databases]]
+binding = "db"
+database_name = "zhaogemail-sky-d1"
+database_id = "43d54980-d5b5-4d05-9239-d498bdb6b7ea"		# zhaogemail-sky-d1
 
-#[[kv_namespaces]]
-#binding = "kv"			#kv绑定名默认不可修改
-#id = ""					#kv数据库id
+[[kv_namespaces]]
+binding = "kv"
+id = "7d2618bb226c4e6bb208976e0f5e670d"			# zhaogemail-sky
 
-#[[r2_buckets]]
-#binding = "r2"			#r2对象存储绑定名默认不可修改
-#bucket_name = ""		#r2对象存储桶的名字
+[[r2_buckets]]
+binding = "r2"
+bucket_name = "zg-test-chengdu"
 
 [assets]
-binding = "assets"		#静态资源绑定名默认不可修改
-directory = "./dist"	#前端vue项目打包的静态资源存放位置,默认dist
+binding = "assets"
+directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
 [triggers]
-crons = ["0 16 * * *"]	#定时任务每天晚上12点执行
+crons = ["0 16 * * *"]	# 定时任务每天晚上12点执行（UTC 16:00）
 
 
 #[vars]
 #orm_log = false
-#domain = []				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
-#admin = admin@example.com				#管理员的邮箱 单个: admin@example.com 多个: admin1@example.com,admin2@example.com
-#jwt_secret = ""			#jwt令牌的密钥,随便填一串字符串
+#domain = []				# 邮件域名可配置多个 示例: ["example1.com","example2.com"]
+#admin = admin@example.com				# 管理员邮箱 单个/多个逗号分隔
+#jwt_secret = ""			# jwt 密钥，建议用 wrangler secret put jwt_secret
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"
