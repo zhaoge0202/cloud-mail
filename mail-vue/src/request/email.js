@@ -12,6 +12,10 @@ export function emailLatest(emailId, accountId) {
     return http.get('/email/latest', {params: {emailId, accountId}, noMsg: true })
 }
 
+export function emailDetail(emailId) {
+    return http.get('/email/detail', {params: {emailId}})
+}
+
 export function emailRead(emailIds) {
     return http.put('/email/read', {emailIds})
 }

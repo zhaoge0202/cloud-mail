@@ -530,9 +530,29 @@ const emailService = {
 			.get();
 	},
 
+	// 轮询专用：只取列表展示字段，不读正文/不查附件，显著降低 D1 读放大
 	async latest(c, params, userId) {
 		let { emailId, accountId } = params;
-		const list = await orm(c).select().from(email).where(
+		emailId = Number(emailId) || 0;
+		accountId = Number(accountId);
+
+		const list = await orm(c).select({
+			emailId: email.emailId,
+			sendEmail: email.sendEmail,
+			envelopeFrom: email.envelopeFrom,
+			name: email.name,
+			accountId: email.accountId,
+			userId: email.userId,
+			subject: email.subject,
+			toEmail: email.toEmail,
+			toName: email.toName,
+			type: email.type,
+			status: email.status,
+			message: email.message,
+			unread: email.unread,
+			createTime: email.createTime,
+			isDel: email.isDel
+		}).from(email).where(
 			and(
 				eq(email.userId, userId),
 				eq(email.isDel, isDel.NORMAL),
@@ -541,21 +561,43 @@ const emailService = {
 				gt(email.emailId, emailId)
 			))
 			.orderBy(desc(email.emailId))
-			.limit(20);
+			.limit(20)
+			.all();
 
-		const emailIds = list.map(item => item.emailId);
+		// 列表摘要/详情打开时再补正文与附件
+		return list.map(row => ({
+			...row,
+			text: '',
+			content: '',
+			cc: '[]',
+			bcc: '[]',
+			recipient: '',
+			attList: []
+		}));
+	},
 
-		if (emailIds.length > 0) {
-
-			const attsList = await attService.selectByEmailIds(c, emailIds);
-
-			list.forEach(emailRow => {
-				const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
-				emailRow.attList = atts;
-			});
+	// 详情：按需加载完整正文 + 附件（配合轻量 latest）
+	async detail(c, params, userId) {
+		const emailId = Number(params.emailId);
+		if (!emailId) {
+			throw new BizError(t('starNotExistEmail'));
 		}
 
-		return list;
+		const emailRow = await orm(c).select().from(email).where(
+			and(
+				eq(email.emailId, emailId),
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.NORMAL)
+			)
+		).get();
+
+		if (!emailRow) {
+			throw new BizError(t('starNotExistEmail'));
+		}
+
+		const attsList = await attService.selectByEmailIds(c, [emailId]);
+		emailRow.attList = attsList;
+		return emailRow;
 	},
 
 	async physicsDelete(c, params) {
@@ -677,10 +719,16 @@ const emailService = {
 			.leftJoin(user, eq(email.userId, user.userId))
 			.where(and(...conditions));
 
-		const queryCount = orm(c).select({ total: count() })
-			.from(email)
-			.leftJoin(user, eq(email.userId, user.userId))
-			.where(and(...countConditions));
+		// count 仅在按用户邮箱过滤时才 join user，避免无过滤时全表 join 扫行
+		const needUserJoinForCount = !!userEmail;
+		const queryCount = needUserJoinForCount
+			? orm(c).select({ total: count() })
+				.from(email)
+				.leftJoin(user, eq(email.userId, user.userId))
+				.where(and(...countConditions))
+			: orm(c).select({ total: count() })
+				.from(email)
+				.where(and(...countConditions));
 
 		if (timeSort) {
 			query.orderBy(asc(email.emailId));
@@ -688,13 +736,13 @@ const emailService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		const listQuery = await query.limit(size).all();
-		const totalQuery = await queryCount.get();
+		const listQuery = query.limit(size).all();
+		const totalQuery = queryCount.get();
 
 		const [list, totalRow] = await Promise.all([listQuery, totalQuery]);
 
 		const emailIds = list.map(item => item.emailId);
-		const attsList = await attService.selectByEmailIds(c, emailIds);
+		const attsList = emailIds.length > 0 ? await attService.selectByEmailIds(c, emailIds) : [];
 
 		list.forEach(emailRow => {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);

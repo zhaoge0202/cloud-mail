@@ -457,10 +457,14 @@ function addItem(email) {
     return
   }
 
+  // 推进水位，避免轮询反复拉取同一批新邮件
+  if (!latestEmail.value || email.emailId > latestEmail.value.emailId) {
+    latestEmail.value = email
+  }
+
   if (props.timeSort) {
     if (noLoading.value) {
       emailList.push(email)
-      latestEmail.value = email
       total.value++
     } else {
       total.value++

@@ -41,11 +41,12 @@
             <el-alert v-if="email.status === 4" :closable="false" :title="$t('complained')" class="email-msg" type="warning" show-icon />
             <el-alert v-if="email.status === 5" :closable="false" :title="$t('delayed')" class="email-msg" type="warning" show-icon />
           </div>
-          <el-scrollbar class="htm-scrollbar" :class="email.attList.length === 0 ? 'bottom-distance' : ''">
-            <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-if="email.content" />
+          <el-scrollbar class="htm-scrollbar" :class="!(email.attList && email.attList.length) ? 'bottom-distance' : ''">
+            <div v-if="detailLoading" class="email-text">...</div>
+            <ShadowHtml class="shadow-html" :html="formatImage(email.content)" v-else-if="email.content" />
             <pre v-else class="email-text" >{{email.text}}</pre>
           </el-scrollbar>
-          <div class="att" v-if="email.attList.length > 0">
+          <div class="att" v-if="email.attList && email.attList.length > 0">
             <div class="att-title">
               <span>{{$t('attachments')}}</span>
               <span>{{$t('attCount',{total: email.attList.length})}}</span>
@@ -100,6 +101,7 @@ import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {shouldAutoMarkRead} from "@/components/email-scroll/unread-utils.js";
+import {emailDetail} from "@/request/email.js";
 
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
@@ -109,13 +111,26 @@ const router = useRouter()
 const email = emailStore.contentData.email
 const showPreview = ref(false)
 const srcList = reactive([])
+const detailLoading = ref(false)
 
 const { t } = useI18n()
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // 轮询插入的轻量邮件没有正文/附件，打开详情时再补全
+  if (email?.emailId && !email.content && !email.text) {
+    detailLoading.value = true
+    try {
+      const detail = await emailDetail(email.emailId)
+      Object.assign(email, detail)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      detailLoading.value = false
+    }
+  }
   if (shouldAutoMarkRead(emailStore.contentData.showUnread, email.unread, EmailUnreadEnum.UNREAD)) {
     email.unread = EmailUnreadEnum.READ;
     emailRead([email.emailId]);
