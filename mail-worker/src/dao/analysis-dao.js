@@ -25,6 +25,8 @@ const analysisDao = {
                         SUM(CASE WHEN type = 1 AND is_del = 0 THEN 1 ELSE 0 END) AS normalSendTotal
                     FROM
                         email
+                    WHERE
+                        status != 6
                 ) e
             CROSS JOIN (
                 SELECT

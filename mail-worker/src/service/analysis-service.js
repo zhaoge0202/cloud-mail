@@ -6,10 +6,48 @@ import { emailConst } from '../const/entity-const';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil';
+
 const analysisService = {
 
 	async echarts(c, params) {
+		if (!this.analysisCacheEnabled(c)) {
+			return await this.queryEcharts(c, params);
+		}
 
+		const cacheKey = this.echartsCacheKey(params);
+		const cache = await c.env.kv.get(cacheKey, { type: 'json' });
+
+		if (cache) {
+			return cache;
+		}
+
+		return await this.refreshEchartsCacheByKey(c, cacheKey);
+	},
+
+	async refreshEchartsCacheByKey(c, cacheKey) {
+		const params = this.echartsParamsByCacheKey(cacheKey);
+		const data = await this.queryEcharts(c, params);
+		// 2 小时兜底过期；定时任务也会主动刷新
+		await c.env.kv.put(cacheKey, JSON.stringify(data), { expirationTtl: 60 * 60 * 2 });
+		return data;
+	},
+
+	async refreshEchartsCache(c) {
+		if (!this.analysisCacheEnabled(c)) {
+			return;
+		}
+
+		const { keys } = await c.env.kv.list({ prefix: kvConst.ANALYSIS_ECHARTS });
+
+		// 尚无访问过的时区不会有 key；有访问过的会预热
+		if (!keys.length) {
+			return;
+		}
+
+		await Promise.all(keys.map(key => this.refreshEchartsCacheByKey(c, key.name)));
+	},
+
+	async queryEcharts(c, params) {
 
 		const { timeZone } = params;
 
@@ -84,7 +122,21 @@ const analysisService = {
 			return {date: day,total}
 		})
 
+	},
+
+	echartsCacheKey(params = {}) {
+		return kvConst.ANALYSIS_ECHARTS + encodeURIComponent(params.timeZone || 'UTC');
+	},
+
+	echartsParamsByCacheKey(cacheKey) {
+		return {
+			timeZone: decodeURIComponent(cacheKey.replace(kvConst.ANALYSIS_ECHARTS, ''))
+		};
+	},
+
+	analysisCacheEnabled(c) {
+		return c.env.analysis_cache === true || c.env.analysis_cache === 'true';
 	}
 }
 
-export default  analysisService
+export default analysisService
