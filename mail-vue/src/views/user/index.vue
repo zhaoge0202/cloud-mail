@@ -46,7 +46,6 @@
         </div>
         <el-table
             ref="tableRef"
-            @filter-change="tableFilter"
             :empty-text="first ? '' : null"
             :default-expand-all="expandStatus"
             :data="users"
@@ -60,13 +59,6 @@
           <el-table-column :width="expandWidth" type="expand">
             <template #default="props">
               <div class="details">
-                <div v-if="!sendNumShow"><span
-                    class="details-item-title">{{ $t('tabSent') }}:</span>{{ props.row.sendEmailCount }}
-                </div>
-                <div v-if="!accountNumShow"><span class="details-item-title">{{ $t('tabMailboxes') }}:</span>{{
-                    props.row.accountCount
-                  }}
-                </div>
                 <div v-if="!createTimeShow"><span class="details-item-title">{{ $t('tabRegisteredAt') }}:</span>{{
                     tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm')
                   }}
@@ -122,17 +114,6 @@
               <div class="email-row">{{ props.row.email }}</div>
             </template>
           </el-table-column>
-          <el-table-column :formatter="formatterReceive" label-class-name="receive" column-key="receive"
-                           :filtered-value="filteredValue" :filters="filters" :width="receiveWidth"
-                           :label="$t('tabReceived')"
-                           prop="receiveEmailCount"/>
-          <el-table-column :formatter="formatterSend" label-class-name="send" column-key="send"
-                           :filtered-value="filteredValue" :filters="filters" v-if="sendNumShow" :label="$t('tabSent')"
-                           prop="sendEmailCount"/>
-          <el-table-column :formatter="formatterAccount" label-class-name="account" column-key="account"
-                           :filtered-value="filteredValue" :filters="filters" v-if="accountNumShow"
-                           :label="$t('tabMailboxes')"
-                           prop="accountCount"/>
           <el-table-column v-if="createTimeShow" :label="$t('tabRegisteredAt')" min-width="160" prop="createTime">
             <template #default="props">
               {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
@@ -289,17 +270,13 @@ const roleStore = useRoleStore()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
 const filteredValue = ['normal', 'del']
-const filters = [{text: t('active'), value: 'normal'}, {text: t('deleted'), value: 'del'}]
 const preserveExpanded = ref(false)
 const emailWidth = ref(230)
 const expandWidth = ref(40)
 const settingWidth = ref(null)
-const sendNumShow = ref(true)
-const accountNumShow = ref(true)
 const createTimeShow = ref(true)
 const statusShow = ref(true)
 const typeShow = ref(true)
-const receiveWidth = ref(null)
 const phonePageShow = ref(false)
 const layout = ref('prev, pager, next,  sizes, total')
 const pageSize = ref('')
@@ -391,71 +368,7 @@ watch(() => userStore.refreshList, () => {
 
 getUserList()
 
-const filterItem = reactive({
-  send: ['normal', 'del'],
-  account: ['normal', 'del'],
-  receive: ['normal', 'del']
-})
 
-function tableFilter(e) {
-
-  if (e.send) filterItem.send = e.send
-  if (e.account) filterItem.account = e.account
-  if (e.receive) filterItem.receive = e.receive
-
-}
-
-function formatterSend(e) {
-
-  if (filterItem.send.length === 2) {
-    return e.sendEmailCount + e.delSendEmailCount
-  }
-
-  if (filterItem.send.includes('normal')) {
-    return e.sendEmailCount
-  }
-
-  if (filterItem.send.includes('del')) {
-    return e.delSendEmailCount
-  }
-
-  return 0
-}
-
-function formatterAccount(e) {
-
-  if (filterItem.account.length === 2) {
-    return e.accountCount + e.delAccountCount
-  }
-
-  if (filterItem.account.includes('normal')) {
-    return e.accountCount
-  }
-
-  if (filterItem.account.includes('del')) {
-    return e.delAccountCount
-  }
-
-  return 0
-}
-
-function formatterReceive(e) {
-
-
-  if (filterItem.receive.length === 2) {
-    return e.receiveEmailCount + e.delReceiveEmailCount
-  }
-
-  if (filterItem.receive.includes('normal')) {
-    return e.receiveEmailCount
-  }
-
-  if (filterItem.receive.includes('del')) {
-    return e.delReceiveEmailCount
-  }
-
-  return 0
-}
 
 function setStatusName(user) {
   if (user.isDel === 1) return t('restore')
@@ -839,14 +752,11 @@ function adjustWidth() {
   const width = window.innerWidth
   statusShow.value = width > 1090
   createTimeShow.value = width > 1367
-  accountNumShow.value = width > 650
-  sendNumShow.value = width > 685
   typeShow.value = width > 767
   emailWidth.value = width > 480 ? 230 : null
   settingWidth.value = width < 480 ? (locale.value === 'en' ? 85 : 75) : null
   expandWidth.value = width < 480 ? 25 : 40
   pagerCount.value = width < 768 ? 7 : 11
-  receiveWidth.value = width < 480 ? 90 : null
   layout.value = width < 768 ? 'pager' : 'prev, pager, next,sizes, total'
   phonePageShow.value = width < 768
   pageSize.value = width < 380 ? 'small' : ''

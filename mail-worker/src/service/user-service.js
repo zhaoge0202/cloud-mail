@@ -230,33 +230,12 @@ const userService = {
 			.select({ total: count() })
 			.from(user)
 			.where(and(...conditions)).get();
-		const userIds = list.map(user => user.userId);
-
 		const types = [...new Set(list.map(user => user.type))];
 
-		// 邮件/账号计数各扫一次表，避免 4+2 次重复 group by
-		const [emailSummary, accountSummary, roleList] = await Promise.all([
-			emailService.selectUserEmailCountSummary(c, userIds),
-			accountService.selectUserAccountCountSummary(c, userIds),
-			roleService.selectByIdsHasPermKey(c, types,'email:send')
-		]);
-
-		const emailMap = Object.fromEntries(emailSummary.map(item => [item.userId, item]));
-		const accountMap = Object.fromEntries(accountSummary.map(item => [item.userId, item]));
+		// 不再统计每人收/发信与邮箱数量（管理列表用不上，且 D1 读放大严重）
+		const roleList = await roleService.selectByIdsHasPermKey(c, types, 'email:send');
 
 		for (const user of list) {
-
-			const userId = user.userId;
-			const emailStat = emailMap[userId] || {};
-			const accountStat = accountMap[userId] || {};
-
-			user.receiveEmailCount = Number(emailStat.receiveEmailCount) || 0;
-			user.sendEmailCount = Number(emailStat.sendEmailCount) || 0;
-			user.accountCount = Number(accountStat.accountCount) || 0;
-
-			user.delReceiveEmailCount = Number(emailStat.delReceiveEmailCount) || 0;
-			user.delSendEmailCount = Number(emailStat.delSendEmailCount) || 0;
-			user.delAccountCount = Number(accountStat.delAccountCount) || 0;
 
 			const roleIndex = roleList.findIndex(roleRow => user.type === roleRow.roleId);
 			let sendAction = {};
