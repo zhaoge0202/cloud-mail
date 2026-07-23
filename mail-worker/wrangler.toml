@@ -29,10 +29,9 @@ run_worker_first = true
 
 [triggers]
 # 每日任务 UTC 16:00；半小时刷新分析页缓存
-crons = ["0 16 * * *", "*/30 * * * *"]
+crons = ["0 16 * * *"]
 
 [vars]
-analysis_cache = true
 #orm_log = false
 #domain = []				# 邮件域名可配置多个 示例: ["example1.com","example2.com"]
 #admin = admin@example.com				# 管理员邮箱 单个/多个逗号分隔

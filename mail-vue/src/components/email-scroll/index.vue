@@ -24,7 +24,7 @@
       </div>
 
       <div class="header-right">
-        <span class="email-count" v-if="props.type === 'all-email' && emailList.length">{{ $t('loadedEmailCount', {total: emailList.length}) }}</span>
+        <span class="email-count" v-if="emailList.length && !total">{{ $t('loadedEmailCount', {total: emailList.length}) }}</span>
         <span class="email-count" v-else-if="total">{{ $t('emailCount', {total: total}) }}</span>
         <Icon v-if="showAccountIcon" class="more-icon icon" width="16" height="16" icon="akar-icons:dot-grid-fill"
               @click="changeAccountShow"/>

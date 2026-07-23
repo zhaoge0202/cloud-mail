@@ -97,32 +97,12 @@ const emailService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		const listQuery = query.limit(size).all();
+		// 方案 A：LIMIT size+1 判断 hasMore，去掉 COUNT / latestEmail 额外查询
+		const rows = await query.limit(size + 1).all();
+		const hasMore = rows.length > size;
+		const pageRows = hasMore ? rows.slice(0, size) : rows;
 
-		const totalQuery = orm(c).select({ total: count() }).from(email).where(
-			and(
-				eq(email.accountId, accountId),
-				eq(email.userId, userId),
-				eq(email.type, type),
-				eq(email.isDel, isDel.NORMAL)
-			)
-		).get();
-
-		// 水位只需要 emailId
-		const latestEmailQuery = orm(c).select({
-			emailId: email.emailId
-		}).from(email).where(
-			and(
-				eq(email.accountId, accountId),
-				eq(email.userId, userId),
-				eq(email.type, type),
-				eq(email.isDel, isDel.NORMAL)
-			))
-			.orderBy(desc(email.emailId)).limit(1).get();
-
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
-
-		list = list.map(item => ({
+		const list = pageRows.map(item => ({
 			...item,
 			content: '',
 			cc: '[]',
@@ -132,7 +112,12 @@ const emailService = {
 			isStar: item.starId != null ? 1 : 0
 		}));
 
-		return { list, total: totalRow.total, latestEmail };
+		// 水位用本页最大 emailId，避免额外查库
+		const latestEmail = list.length
+			? { emailId: Math.max(...list.map(item => item.emailId)) }
+			: null;
+
+		return { list, hasMore, latestEmail };
 	},
 
 	async delete(c, params, userId) {
