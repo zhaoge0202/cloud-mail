@@ -29,8 +29,24 @@ const init = {
 			await this.v2_5DB(c);
 			await this.v2_6DB(c);
 			await this.v2_7DB(c);
+			await this.v2_8DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_8DB(c) {
+			// 用户列表 count 汇总：按 user_id 聚合邮件/账号
+			const indexSqlList = [
+				`CREATE INDEX IF NOT EXISTS idx_email_user_type_del ON email(user_id, type, is_del);`,
+				`CREATE INDEX IF NOT EXISTS idx_account_user_del ON account(user_id, is_del);`
+			];
+			for (const sql of indexSqlList) {
+				try {
+					await c.env.db.prepare(sql).run();
+				} catch (e) {
+					console.warn(`跳过索引创建，原因：${e.message}`);
+				}
+			}
 		},
 
 		async v2_7DB(c) {

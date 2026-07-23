@@ -609,6 +609,9 @@ const emailService = {
 	},
 
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {
+		if (!userIds?.length) {
+			return [];
+		}
 		const result = await orm(c)
 			.select({
 				userId: email.userId,
@@ -621,6 +624,26 @@ const emailService = {
 				eq(email.isDel, del)
 			))
 			.groupBy(email.userId);
+		return result;
+	},
+
+	// 用户列表用：一次扫描汇总收/发 × 正常/已删，避免 4 次重复扫同一批邮件
+	async selectUserEmailCountSummary(c, userIds) {
+		if (!userIds?.length) {
+			return [];
+		}
+		const result = await orm(c)
+			.select({
+				userId: email.userId,
+				receiveEmailCount: sql`sum(case when ${email.type} = ${emailConst.type.RECEIVE} and ${email.isDel} = ${isDel.NORMAL} then 1 else 0 end)`,
+				sendEmailCount: sql`sum(case when ${email.type} = ${emailConst.type.SEND} and ${email.isDel} = ${isDel.NORMAL} then 1 else 0 end)`,
+				delReceiveEmailCount: sql`sum(case when ${email.type} = ${emailConst.type.RECEIVE} and ${email.isDel} = ${isDel.DELETE} then 1 else 0 end)`,
+				delSendEmailCount: sql`sum(case when ${email.type} = ${emailConst.type.SEND} and ${email.isDel} = ${isDel.DELETE} then 1 else 0 end)`
+			})
+			.from(email)
+			.where(inArray(email.userId, userIds))
+			.groupBy(email.userId)
+			.all();
 		return result;
 	},
 

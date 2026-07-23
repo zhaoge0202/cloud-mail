@@ -175,6 +175,9 @@ const accountService = {
 	},
 
 	async selectUserAccountCountList(c, userIds, del = isDel.NORMAL) {
+		if (!userIds?.length) {
+			return [];
+		}
 		const result = await orm(c)
 			.select({
 				userId: account.userId,
@@ -186,6 +189,24 @@ const accountService = {
 				eq(account.isDel, del)
 			))
 			.groupBy(account.userId)
+		return result;
+	},
+
+	// 用户列表用：一次扫描汇总正常/已删账号数
+	async selectUserAccountCountSummary(c, userIds) {
+		if (!userIds?.length) {
+			return [];
+		}
+		const result = await orm(c)
+			.select({
+				userId: account.userId,
+				accountCount: sql`sum(case when ${account.isDel} = ${isDel.NORMAL} then 1 else 0 end)`,
+				delAccountCount: sql`sum(case when ${account.isDel} = ${isDel.DELETE} then 1 else 0 end)`
+			})
+			.from(account)
+			.where(inArray(account.userId, userIds))
+			.groupBy(account.userId)
+			.all();
 		return result;
 	},
 
