@@ -691,7 +691,16 @@ const emailService = {
 			conditions.push(sql`${email.text} COLLATE NOCASE LIKE ${buildContentLikePattern(content)}`);
 		}
 
-		conditions.push(ne(email.status, emailConst.status.SAVING));
+		// SAVING 草稿极少；用 IN 代替 <>，避免破坏 (type, email_id) 索引范围扫描
+		conditions.push(inArray(email.status, [
+			emailConst.status.RECEIVE,
+			emailConst.status.SENT,
+			emailConst.status.DELIVERED,
+			emailConst.status.BOUNCED,
+			emailConst.status.COMPLAINED,
+			emailConst.status.DELAYED,
+			emailConst.status.NOONE
+		]));
 
 		if (timeSort) {
 			conditions.push(gt(email.emailId, emailId));
@@ -699,9 +708,12 @@ const emailService = {
 			conditions.push(lt(email.emailId, emailId));
 		}
 
-		// 列表轻量化：不返回 content/全文，text 截断；附件详情再查
-		// 方案 A：LIMIT size+1 判断 hasMore，彻底不做 COUNT(*)
-		const query = orm(c).select({
+		// 列表轻量化 + 方案 A：
+		// 1) 先只查 email 表 LIMIT size+1（避免 LEFT JOIN user 放大扫行）
+		// 2) 再按本页 userId 批量补邮箱
+		// 3) 仅当按用户邮箱筛选时才 join user
+		const needUserJoin = !!userEmail;
+		const selectFields = {
 			emailId: email.emailId,
 			sendEmail: email.sendEmail,
 			envelopeFrom: email.envelopeFrom,
@@ -717,12 +729,23 @@ const emailService = {
 			message: email.message,
 			unread: email.unread,
 			createTime: email.createTime,
-			isDel: email.isDel,
-			userEmail: user.email
-		})
-			.from(email)
-			.leftJoin(user, eq(email.userId, user.userId))
-			.where(and(...conditions));
+			isDel: email.isDel
+		};
+
+		let query;
+		if (needUserJoin) {
+			query = orm(c).select({
+				...selectFields,
+				userEmail: user.email
+			})
+				.from(email)
+				.leftJoin(user, eq(email.userId, user.userId))
+				.where(and(...conditions));
+		} else {
+			query = orm(c).select(selectFields)
+				.from(email)
+				.where(and(...conditions));
+		}
 
 		if (timeSort) {
 			query.orderBy(asc(email.emailId));
@@ -734,8 +757,28 @@ const emailService = {
 		const hasMore = rows.length > size;
 		const pageRows = hasMore ? rows.slice(0, size) : rows;
 
+		// 无 user join 时补用户邮箱（仅本页，最多 size 个 userId）
+		if (!needUserJoin && pageRows.length > 0) {
+			const userIds = [...new Set(pageRows.map(item => item.userId).filter(Boolean))];
+			if (userIds.length > 0) {
+				const userRows = await orm(c).select({
+					userId: user.userId,
+					email: user.email
+				}).from(user).where(inArray(user.userId, userIds)).all();
+				const emailByUserId = Object.fromEntries(userRows.map(u => [u.userId, u.email]));
+				pageRows.forEach(item => {
+					item.userEmail = emailByUserId[item.userId] || '';
+				});
+			} else {
+				pageRows.forEach(item => {
+					item.userEmail = '';
+				});
+			}
+		}
+
 		const lightList = pageRows.map(item => ({
 			...item,
+			userEmail: item.userEmail || '',
 			content: '',
 			cc: '[]',
 			bcc: '[]',

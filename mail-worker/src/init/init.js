@@ -28,8 +28,24 @@ const init = {
 			await this.v2_4DB(c);
 			await this.v2_5DB(c);
 			await this.v2_6DB(c);
+			await this.v2_7DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_7DB(c) {
+			// 全部邮件：按 type + email_id 倒序翻页，避免 status<> 破坏索引导致单页扫数万行
+			const indexSqlList = [
+				`CREATE INDEX IF NOT EXISTS idx_email_type_id ON email(type, email_id);`,
+				`CREATE INDEX IF NOT EXISTS idx_email_del_id ON email(is_del, email_id);`
+			];
+			for (const sql of indexSqlList) {
+				try {
+					await c.env.db.prepare(sql).run();
+				} catch (e) {
+					console.warn(`跳过索引创建，原因：${e.message}`);
+				}
+			}
 		},
 
 		async v2_6DB(c) {
