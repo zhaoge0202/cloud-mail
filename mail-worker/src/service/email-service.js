@@ -548,50 +548,10 @@ const emailService = {
 			.get();
 	},
 
-	// 轮询专用：只取列表展示字段，不读正文/不查附件，显著降低 D1 读放大
+	// 自动刷新已下线：旧前端/缓存页仍可能轮询此接口。
+	// 直接返回空列表，禁止再打 D1（否则旧客户端会持续产生上万次查询）。
 	async latest(c, params, userId) {
-		let { emailId, accountId } = params;
-		emailId = Number(emailId) || 0;
-		accountId = Number(accountId);
-
-		const list = await orm(c).select({
-			emailId: email.emailId,
-			sendEmail: email.sendEmail,
-			envelopeFrom: email.envelopeFrom,
-			name: email.name,
-			accountId: email.accountId,
-			userId: email.userId,
-			subject: email.subject,
-			toEmail: email.toEmail,
-			toName: email.toName,
-			type: email.type,
-			status: email.status,
-			message: email.message,
-			unread: email.unread,
-			createTime: email.createTime,
-			isDel: email.isDel
-		}).from(email).where(
-			and(
-				eq(email.userId, userId),
-				eq(email.isDel, isDel.NORMAL),
-				eq(email.accountId, accountId),
-				eq(email.type, emailConst.type.RECEIVE),
-				gt(email.emailId, emailId)
-			))
-			.orderBy(desc(email.emailId))
-			.limit(20)
-			.all();
-
-		// 列表摘要/详情打开时再补正文与附件
-		return list.map(row => ({
-			...row,
-			text: '',
-			content: '',
-			cc: '[]',
-			bcc: '[]',
-			recipient: '',
-			attList: []
-		}));
+		return [];
 	},
 
 	// 详情：按需加载完整正文 + 附件（收件箱轻量列表 / 全部邮件轻量列表）

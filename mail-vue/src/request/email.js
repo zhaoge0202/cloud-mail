@@ -8,8 +8,9 @@ export function emailDelete(emailIds) {
     return http.delete('/email/delete?emailIds=' + emailIds)
 }
 
-export function emailLatest(emailId, accountId) {
-    return http.get('/email/latest', {params: {emailId, accountId}, noMsg: true })
+// 已废弃：自动刷新关闭后不应再调用；保留函数避免旧引用报错
+export function emailLatest() {
+    return Promise.resolve([])
 }
 
 export function emailDetail(emailId) {

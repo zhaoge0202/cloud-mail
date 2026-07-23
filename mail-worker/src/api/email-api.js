@@ -9,9 +9,9 @@ app.get('/email/list', async (c) => {
 	return c.json(result.ok(data));
 });
 
+// 自动刷新已关闭；保留路由兼容旧前端，固定返回空，避免无意义鉴权后的业务查询
 app.get('/email/latest', async (c) => {
-	const list = await emailService.latest(c, c.req.query(), userContext.getUserId(c));
-	return c.json(result.ok(list));
+	return c.json(result.ok([]));
 });
 
 app.get('/email/detail', async (c) => {
