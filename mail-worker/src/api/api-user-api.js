@@ -14,7 +14,7 @@ import emailUtils from '../utils/email-utils';
 import adminUtils from '../utils/admin-utils';
 import orm from '../entity/orm';
 import email from '../entity/email';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 
 /**
  * 生成用户API Token
@@ -177,13 +177,14 @@ app.get('/user/account/list', async (c) => {
  *   timeSort?: string,     // 时间排序（asc 最旧，desc 最新）默认desc
  *   type?: integer,        // 邮件类型 （0 收件，1发件，空 全部）
  *   isDel?: integer,       // 是否删除 （0 正常，1删除，空 全部）
+ *   emailId?: integer,     // 游标分页水位，desc 查小于该ID，asc 查大于该ID
  *   num?: integer,         // 页码，默认1
  *   size?: integer         // 每页数量，默认20
  * }
  */
 app.post('/user/email/list', async (c) => {
 	const userId = userContext.getUserId(c);
-	let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type, isDel } = await c.req.json();
+	let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type, isDel, emailId } = await c.req.json();
 
 	const query = orm(c).select({
 		emailId: email.emailId,
@@ -209,6 +210,19 @@ app.post('/user/email/list', async (c) => {
 
 	size = Number(size);
 	num = Number(num);
+	emailId = Number(emailId);
+
+	if (!size || Number.isNaN(size) || size < 1) {
+		size = 20;
+	}
+
+	if (size > 30) {
+		size = 30;
+	}
+
+	if (!num || Number.isNaN(num) || num < 1) {
+		num = 1;
+	}
 
 	num = (num - 1) * size;
 
@@ -246,6 +260,14 @@ app.post('/user/email/list', async (c) => {
 		conditions.push(eq(email.isDel, isDel));
 	}
 
+	if (emailId) {
+		if (timeSort === 'asc') {
+			conditions.push(gt(email.emailId, emailId));
+		} else {
+			conditions.push(lt(email.emailId, emailId));
+		}
+	}
+
 	if (conditions.length === 1) {
 		query.where(...conditions);
 	} else if (conditions.length > 1) {
@@ -258,10 +280,10 @@ app.post('/user/email/list', async (c) => {
 		query.orderBy(desc(email.emailId));
 	}
 
-	const list = await query.limit(size).offset(num).all();
+	const pagedQuery = emailId ? query.limit(size) : query.limit(size).offset(num);
+	const list = await pagedQuery.all();
 
 	return c.json(result.ok(list));
 });
 
 export default app;
-

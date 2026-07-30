@@ -152,6 +152,7 @@ Content-Type: application/json
   "timeSort": "desc",
   "type": 0,
   "isDel": 0,
+  "emailId": 0,
   "num": 1,
   "size": 20
 }
@@ -224,7 +225,7 @@ curl -X POST "https://your-domain.com/api/user/account/add" \
 curl -X POST "https://your-domain.com/api/user/email/list" \
   -H "Authorization: $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"type":0,"isDel":0,"num":1,"size":20}'
+  -d '{"type":0,"isDel":0,"emailId":0,"size":20}'
 
 # 5. 删除邮箱
 curl -X DELETE "https://your-domain.com/api/user/account/delete?accountId=2" \
@@ -405,4 +406,3 @@ INBOUND_IP_WHITELIST=192.168.1.100,203.0.113.10  # 可选
 **更新时间**: 2025-10-13
 **版本**: v2.3
 **兼容性**: 完全向后兼容原版
-

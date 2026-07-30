@@ -30,8 +30,18 @@ const init = {
 			await this.v2_6DB(c);
 			await this.v2_7DB(c);
 			await this.v2_8DB(c);
+			await this.v2_9DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_9DB(c) {
+			// 用户 API 邮件列表：按用户 + 收件邮箱 + 类型 + 删除态倒序翻页
+			try {
+				await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_to_type_del_id ON email(user_id, to_email, type, is_del, email_id);`).run();
+			} catch (e) {
+				console.warn(`跳过用户 API 邮件列表索引创建，原因：${e.message}`);
+			}
 		},
 
 		async v2_8DB(c) {
