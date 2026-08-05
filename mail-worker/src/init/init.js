@@ -31,8 +31,18 @@ const init = {
 			await this.v2_7DB(c);
 			await this.v2_8DB(c);
 			await this.v2_9DB(c);
+			await this.v2_10DB(c);
 			await settingService.refresh(c);
 			return c.text(t('initSuccess'));
+		},
+
+		async v2_10DB(c) {
+			// 用户 API Token 鉴权：未设置 Token 的用户不进入索引，降低索引体积和维护成本。
+			try {
+				await c.env.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_api_token ON user(api_token) WHERE api_token IS NOT NULL;`).run();
+			} catch (e) {
+				console.warn(`跳过用户 API Token 索引创建，原因：${e.message}`);
+			}
 		},
 
 		async v2_9DB(c) {

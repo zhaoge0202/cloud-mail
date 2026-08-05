@@ -142,15 +142,9 @@ app.use('*', async (c, next) => {
 			throw new BizError(t('authExpired'), 401);
 		}
 
-		// 获取用户完整信息
-		const userRow = await userService.selectById(c, tokenData.userId);
-
-		if (!userRow) {
-			throw new BizError(t('authExpired'), 401);
-		}
-
-		// 设置用户上下文
-		c.set('user', userRow);
+		// 鉴权查询已经返回本次请求需要的用户和角色，禁止重复读取 D1。
+		c.set('user', tokenData.user);
+		c.set('apiRole', tokenData.role);
 		c.set('isApiToken', true); // 标记这是API Token认证
 
 		return await next();

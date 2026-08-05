@@ -4,10 +4,11 @@ import userService from './user-service';
 import roleService from './role-service';
 import adminUtils from '../utils/admin-utils';
 import cryptoUtils from '../utils/crypto-utils';
-import { isDel } from '../const/entity-const';
+import { isDel, userConst } from '../const/entity-const';
 import { v4 as uuidv4 } from 'uuid';
 import orm from '../entity/orm';
 import user from '../entity/user';
+import role from '../entity/role';
 import { eq } from 'drizzle-orm';
 
 const apiTokenService = {
@@ -29,6 +30,10 @@ const apiTokenService = {
 
 		if (!userRow || userRow.isDel === isDel.DELETE) {
 			throw new BizError(t('notExistUser'));
+		}
+
+		if (userRow.status === userConst.status.BAN) {
+			throw new BizError(t('isBanUser'), 403);
 		}
 
 		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
@@ -73,11 +78,11 @@ const apiTokenService = {
 	},
 
 	/**
-	 * 验证API Token
-	 * 【优化】直接查询数据库，不使用 KV，减少 KV 读取次数
+	 * 验证 API Token，并一次性加载当前请求需要的用户与角色上下文。
+	 * 保留每次请求实时校验，确保撤销 Token、封禁用户和关闭 API 权限立即生效。
 	 * @param {Object} c - Hono context
 	 * @param {string} token - API Token
-	 * @returns {Object|null} { userId, email } or null
+	 * @returns {Object|null} { user, role } or null
 	 */
 	async verifyToken(c, token) {
 		if (!token) {
@@ -85,19 +90,38 @@ const apiTokenService = {
 		}
 
 		try {
-			// 直接从数据库查询，不查 KV
-			const userRow = await orm(c)
-				.select()
+			const tokenContext = await orm(c)
+				.select({
+					user: {
+						userId: user.userId,
+						email: user.email,
+						type: user.type,
+						status: user.status,
+						isDel: user.isDel,
+						apiToken: user.apiToken,
+						apiAddCount: user.apiAddCount,
+						apiAddResetTime: user.apiAddResetTime
+					},
+					role: {
+						roleId: role.roleId,
+						name: role.name,
+						enableApi: role.enableApi,
+						accountCount: role.accountCount,
+						availDomain: role.availDomain,
+						apiAddAccountCount: role.apiAddAccountCount,
+						apiAddAccountType: role.apiAddAccountType
+					}
+				})
 				.from(user)
+				.leftJoin(role, eq(role.roleId, user.type))
 				.where(eq(user.apiToken, token))
 				.get();
+			const userRow = tokenContext?.user;
+			const roleRow = tokenContext?.role;
 
-			if (!userRow || userRow.isDel === isDel.DELETE || !userRow.apiToken) {
+			if (!userRow || userRow.isDel === isDel.DELETE || userRow.status === userConst.status.BAN || !userRow.apiToken) {
 				return null;
 			}
-
-			// 检查用户角色的API权限
-			const roleRow = await roleService.selectById(c, userRow.type);
 
 			// 非管理员需要检查API权限
 			if (!adminUtils.isAdmin(c, userRow.email) && (!roleRow || roleRow.enableApi !== 1)) {
@@ -105,10 +129,7 @@ const apiTokenService = {
 				return null;
 			}
 
-			return {
-				userId: userRow.userId,
-				email: userRow.email
-			};
+			return { user: userRow, role: roleRow };
 		} catch (error) {
 			console.error('API Token verification error:', error);
 			return null;
@@ -158,98 +179,18 @@ const apiTokenService = {
 	},
 
 	/**
-	 * 检查并更新API创建邮箱次数限制
-	 * @param {Object} c - Hono context
-	 * @param {number} userId - 用户ID
-	 * @throws {BizError} 如果超过限制
-	 */
-	async checkAndUpdateApiAddAccountLimit(c, userId) {
-		// 获取用户信息
-		const userRow = await userService.selectById(c, userId);
-
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		// 管理员不受限制
-		if (adminUtils.isAdmin(c, userRow.email)) {
-			return;
-		}
-
-		// 获取角色配置
-		const roleRow = await roleService.selectById(c, userRow.type);
-
-		if (!roleRow) {
-			throw new BizError(t('roleNotExist'));
-		}
-
-		// 如果是ban类型或没有设置限制,不限制
-		if (roleRow.apiAddAccountType === 'ban' || !roleRow.apiAddAccountCount) {
-			return;
-		}
-
-		const now = new Date();
-		const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
-
-		// 检查是否需要重置计数(day类型)
-		if (roleRow.apiAddAccountType === 'day') {
-			const resetTime = userRow.apiAddResetTime;
-
-			// 如果是新的一天,重置计数
-			if (!resetTime || resetTime !== today) {
-				await orm(c)
-					.update(user)
-					.set({
-						apiAddCount: 0,
-						apiAddResetTime: today
-					})
-					.where(eq(user.userId, userId))
-					.run();
-
-				// 更新内存中的值
-				userRow.apiAddCount = 0;
-				userRow.apiAddResetTime = today;
-			}
-		}
-
-		// 检查是否超过限制
-		if (userRow.apiAddCount >= roleRow.apiAddAccountCount) {
-			console.log(`[API Add Account Limit] User: ${userRow.email}, Type: ${roleRow.apiAddAccountType}, Count: ${userRow.apiAddCount}/${roleRow.apiAddAccountCount}`);
-			if (roleRow.apiAddAccountType === 'day') {
-				throw new BizError(t('apiAddAccountDayLimit'), 403);
-			} else if (roleRow.apiAddAccountType === 'count') {
-				throw new BizError(t('apiAddAccountTotalLimit'), 403);
-			}
-		}
-
-		// 增加计数
-		await orm(c)
-			.update(user)
-			.set({
-				apiAddCount: userRow.apiAddCount + 1
-			})
-			.where(eq(user.userId, userId))
-			.run();
-	},
-
-	/**
 	 * 获取用户API使用情况
 	 * @param {Object} c - Hono context
-	 * @param {number} userId - 用户ID
+	 * @param {Object} userRow - 已认证用户
+	 * @param {Object} roleRow - 已认证角色
 	 * @returns {Object} API使用情况
 	 */
-	async getApiStatus(c, userId) {
-		// 查询用户信息
-		const userRow = await userService.selectById(c, userId);
-
+	getApiStatus(c, userRow, roleRow) {
 		if (!userRow) {
 			throw new BizError(t('notExistUser'));
 		}
 
-		// 查询角色信息
-		const roleRow = await roleService.selectById(c, userRow.type);
-
-		if (!roleRow) {
+		if (!roleRow && !adminUtils.isAdmin(c, userRow.email)) {
 			throw new BizError(t('roleNotExist'));
 		}
 
@@ -259,10 +200,10 @@ const apiTokenService = {
 		// 构建返回数据
 		const status = {
 			hasToken: !!userRow.apiToken,
-			apiEnabled: isAdmin || roleRow.enableApi === 1,
+			apiEnabled: isAdmin || roleRow?.enableApi === 1,
 			isAdmin: isAdmin,
-			addAccountType: roleRow.apiAddAccountType || 'ban',
-			addAccountLimit: roleRow.apiAddAccountCount || 0,
+			addAccountType: roleRow?.apiAddAccountType || 'ban',
+			addAccountLimit: roleRow?.apiAddAccountCount || 0,
 			addAccountUsed: userRow.apiAddCount || 0,
 			addAccountResetTime: userRow.apiAddResetTime || null
 		};
@@ -286,8 +227,17 @@ const apiTokenService = {
 		}
 
 		return status;
+	},
+
+	async getApiStatusByUserId(c, userId) {
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
+
+		const roleRow = await roleService.selectById(c, userRow.type);
+		return this.getApiStatus(c, userRow, roleRow);
 	}
 };
 
 export default apiTokenService;
-

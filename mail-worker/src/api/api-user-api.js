@@ -3,15 +3,6 @@ import result from '../model/result';
 import apiTokenService from '../service/api-token-service';
 import accountService from '../service/account-service';
 import userContext from '../security/user-context';
-import BizError from '../error/biz-error';
-import { t } from '../i18n/i18n';
-import userService from '../service/user-service';
-import roleService from '../service/role-service';
-import settingService from '../service/setting-service';
-import { settingConst } from '../const/entity-const';
-import verifyUtils from '../utils/verify-utils';
-import emailUtils from '../utils/email-utils';
-import adminUtils from '../utils/admin-utils';
 import orm from '../entity/orm';
 import email from '../entity/email';
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
@@ -42,8 +33,7 @@ app.post('/user/token/revoke', async (c) => {
  * Header: Authorization: <api-token>
  */
 app.get('/user/api/status', async (c) => {
-	const userId = userContext.getUserId(c);
-	const status = await apiTokenService.getApiStatus(c, userId);
+	const status = apiTokenService.getApiStatus(c, userContext.getUser(c), c.get('apiRole'));
 	return c.json(result.ok(status));
 });
 
@@ -54,67 +44,12 @@ app.get('/user/api/status', async (c) => {
  * Body: { email }
  */
 app.post('/user/account/add', async (c) => {
-	const userId = userContext.getUserId(c);
-	const params = await c.req.json();
-	const { email } = params;
-
-	// 验证邮箱格式
-	if (!email) {
-		throw new BizError(t('emptyEmail'));
-	}
-
-	if (!verifyUtils.isEmail(email)) {
-		throw new BizError(t('notEmail'));
-	}
-
-	// 检查多号模式配置
-	const { addEmail, manyEmail } = await settingService.query(c);
-	
-	if (!(addEmail === settingConst.addEmail.OPEN && manyEmail === settingConst.manyEmail.OPEN)) {
-		throw new BizError(t('addAccountDisabled'));
-	}
-
-	// 检查域名是否在允许列表中
-	if (!c.env.domain.includes(emailUtils.getDomain(email))) {
-		throw new BizError(t('notExistDomain'));
-	}
-
-	// 检查邮箱是否已存在
-	const existingAccount = await accountService.selectByEmailIncludeDel(c, email);
-	
-	if (existingAccount) {
-		throw new BizError(t('isRegAccount'));
-	}
-
-	// 获取用户信息和角色
-	const userRow = await userService.selectById(c, userId);
-	const roleRow = await roleService.selectById(c, userRow.type);
-
-	if (!roleRow) {
-		throw new BizError(t('roleNotExist'));
-	}
-
-	// 检查用户权限（非管理员需要检查）
-	if (!adminUtils.isAdmin(c, userRow.email)) {
-		// 检查账户数量限制
-		if (roleRow.accountCount > 0) {
-			const userAccountCount = await accountService.countUserAccount(c, userId);
-			if (userAccountCount >= roleRow.accountCount) {
-				throw new BizError(t('accountLimit'), 403);
-			}
-		}
-
-		// 检查域名权限
-		if (!roleService.hasAvailDomainPerm(roleRow.availDomain, email)) {
-			throw new BizError(t('noDomainPermAdd'), 403);
-		}
-
-		// 检查API创建邮箱次数限制
-		await apiTokenService.checkAndUpdateApiAddAccountLimit(c, userId);
-	}
-
-	// 添加邮箱（不需要验证码，因为是API调用）
-	const account = await accountService.addByAdmin(c, { userId, email });
+	const account = await accountService.addByApi(
+		c,
+		await c.req.json(),
+		userContext.getUser(c),
+		c.get('apiRole')
+	);
 	
 	return c.json(result.ok(account));
 });
@@ -126,26 +61,7 @@ app.post('/user/account/add', async (c) => {
  * Query: accountId=123
  */
 app.delete('/user/account/delete', async (c) => {
-	const userId = userContext.getUserId(c);
-	const { accountId } = c.req.query();
-
-	if (!accountId) {
-		throw new BizError(t('emptyAccountId'));
-	}
-
-	// 验证账户是否属于当前用户
-	const account = await accountService.selectById(c, Number(accountId));
-	
-	if (!account) {
-		throw new BizError(t('accountNotExist'));
-	}
-
-	if (account.userId !== userId) {
-		throw new BizError(t('noPermission'), 403);
-	}
-
-	// 删除账户
-	await accountService.delete(c, { accountId }, userId);
+	await accountService.deleteByApi(c, c.req.query(), userContext.getUser(c));
 	
 	return c.json(result.ok());
 });

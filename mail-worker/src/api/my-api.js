@@ -21,7 +21,7 @@ app.delete('/my/delete', async (c) => {
 
 app.get('/my/apiStatus', async (c) => {
 	const userId = userContext.getUserId(c);
-	const status = await apiTokenService.getApiStatus(c, userId);
+	const status = await apiTokenService.getApiStatusByUserId(c, userId);
 	return c.json(result.ok(status));
 });
 
